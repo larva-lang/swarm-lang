@@ -24,7 +24,7 @@ def main():
 
     #主模块
     assert len(args) == 1
-    main_mod_file = args[0]
+    main_mod_file = os.path.abspath(args[0])
     assert main_mod_file.endswith(".sw")
     if not os.path.isfile(main_mod_file):
         swc_util.exit("主模块代码‘%s’不是一个文件" % main_mod_file)
