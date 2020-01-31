@@ -23,7 +23,7 @@ _TOKEN_RE = re.compile(
     #词，关键字或标识符
     r"""([a-zA-Z_]\w*)""")
 
-ASSIGN_SYM_SET = set([_op + "=" for _op in ("%", "^", "&", "*", "-", "+", "|", "/", "<<", ">>")])
+ASSIGN_SYM_SET = set(["="] + [_op + "=" for _op in ("%", "^", "&", "*", "-", "+", "|", "/", "<<", ">>")])
 BINOCULAR_OP_SYM_SET = set(["%", "^", "&", "*", "-", "+", "|", "<", ">", "/", "!=", "==", "<<", "<=", ">>", ">=", "&&", "||"]) #不含is
 
 #合法的符号集
@@ -302,7 +302,7 @@ class Parser:
             if sym is not None:
                 #符号
                 if sym not in _SYM_SET:
-                    _syntax_err(self, "非法的符号'%r'" % sym)
+                    _syntax_err(self, "非法的符号%r" % sym)
 
                 if sym in ("'", '"'):
                     #字符串，单独解析，并会自行调整pos
