@@ -2,14 +2,14 @@
 
 import os
 
-import swc_util
+import swc_util, swc_token
 
 mod_path = None
 
 def find_mod_file(mod_name):
-    for d in _mod_path:
-        mod_fn = "%s/%s.coc" % (d, mod_name)
-        if os.isfile(mod_fn):
+    for d in mod_path:
+        mod_fn = "%s/%s.sw" % (d, mod_name)
+        if os.path.isfile(mod_fn):
             return mod_fn
     swc_util.exit("找不到模块‘%s’" % mod_name)
 

@@ -44,7 +44,7 @@ class _Token:
 
         self._set_is_XXX()
 
-        if self.is_literal(str):
+        if self.is_literal("str"):
             #字符串字面量的value改为list，方便合并连续的字符串字面量
             assert isinstance(self.value, str)
             self.value = [self.value]
@@ -190,7 +190,9 @@ class _TokenList:
         for t in self.l:
             if t.is_literal("str"):
                 assert isinstance(t.value, list)
+                t._unfreeze()
                 t.value = "".join(t.value)
+                t._freeze()
 
 def _pos_desc(obj):
     return "文件[%s]行[%d]列[%d]" % (obj.src_fn, obj.line_idx + 1, obj.pos + 1)
@@ -270,9 +272,9 @@ class Parser:
 
         return "".join(l)
 
-    def _parse_token(self):
+    def _parse_token(self, line):
         token_pos = self.pos
-        s = self.line[token_pos :]
+        s = line[token_pos :]
         m = _TOKEN_RE.match(s)
         if m is None:
             _syntax_err(self, "词法错误")
@@ -386,7 +388,7 @@ class Parser:
                 continue
 
             #解析token
-            token = self._parse_token()
+            token = self._parse_token(line)
             token_list.append(token)
 
         return token_list, uncompleted_comment_start_pos, raw_str
@@ -447,7 +449,7 @@ class Parser:
                 assert raw_str is None
                 in_comment = True
 
-        self.line_idx, self.pos = len(line_list), len(line_list[-1])
+        self.line_idx, self.pos = len(line_list), (len(line_list[-1]) if line_list else 0)
         if in_comment:
             _syntax_err(self, "存在未结束的块注释")
         if raw_str is not None:
