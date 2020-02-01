@@ -29,8 +29,8 @@ BINOCULAR_OP_SYM_SET = set(["%", "^", "&", "*", "-", "+", "|", "<", ">", "/", "!
 #合法的符号集
 _SYM_SET = set("""~!(){}[]:;'",.""") | BINOCULAR_OP_SYM_SET | ASSIGN_SYM_SET
 
-_RESERVED_WORD_SET = set(["import", "class", "for", "while", "if", "else", "return", "nil", "true", "false", "break", "continue", "this",
-                          "public", "var", "defer", "final", "is"])
+_RESERVED_WORD_SET = set(["import", "class", "func", "for", "while", "if", "else", "return", "nil", "true", "false", "break", "continue",
+                          "this", "public", "var", "defer", "final", "is"])
 
 class _Token:
     def __init__(self, type, value, src_fn, line_idx, pos):
@@ -306,7 +306,6 @@ class Parser:
 
                 if sym in ("'", '"'):
                     #字符串，单独解析，并会自行调整pos
-                    self.pos += 1
                     value = self._parse_str(s)
                     return _Token("literal_str", value, self.src_fn, self.line_idx, token_pos)
 
@@ -485,11 +484,11 @@ def is_valid_name(name):
 
 def parse_token_list_until_sym(token_list, end_sym_set):
     bracket_map = {"(" : ")", "[" : "]", "{" : "}"}
-    sub_token_list = _TokenList(token_list.src_file)
+    sub_token_list = _TokenList(token_list.src_fn)
     stk = []
     while True:
         t = token_list.pop()
-        sub_token_list.append(t)
+        sub_token_list._append(t)
         if t.is_sym and t.value in end_sym_set and not stk:
             return sub_token_list, t.value
         if t.is_sym and t.value in bracket_map:

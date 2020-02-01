@@ -27,6 +27,8 @@ def _parse_decr_set(token_list):
 def _parse_arg_map(token_list):
     arg_map = swc_util.OrderedDict()
     while True:
+        if token_list.peek().is_sym(")"):
+            break
         t, name = token_list.pop_name()
         if name in arg_map:
             t.syntax_err("参数重复定义")
@@ -37,8 +39,6 @@ def _parse_arg_map(token_list):
         if not t.is_sym(","):
             t.syntax_err("需要‘,’或‘)’")
         token_list.pop()
-        if token_list.peek().is_sym(")"):
-            break
     return arg_map
 
 def precompile(main_mod_name):
@@ -210,7 +210,7 @@ class _Cls:
                 t.syntax_err("属性或方法名重定义")
 
 class _Func:
-    def __init__(self, mod, decr_set, name_token, name, arg_map, block_token_list)
+    def __init__(self, mod, decr_set, name_token, name, arg_map, block_token_list):
         self.mod        = mod
         self.decr_set   = decr_set
         self.name_token = name_token
@@ -326,6 +326,7 @@ class Mod:
         if name == "__builtins":
             t.syntax_err("不能显式导入‘__builtins’")
         self.dep_mod_set.add(name)
+        token_list.pop_sym(";")
 
     def _parse_cls(self, decr_set, token_list):
         t, name = token_list.pop_name()
@@ -359,7 +360,7 @@ class Mod:
         if not t.is_sym("="):
             t.syntax_err("需要‘;’或‘=’")
         block_token_list, sym = swc_token.parse_token_list_until_sym(token_list, (";",))
-        assert sym == "}"
+        assert sym == ";"
         self.gv_init_list.append(_GvInit(self, var_def, block_token_list))
 
     def _check_redefine(self, t, name):

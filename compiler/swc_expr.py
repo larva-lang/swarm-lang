@@ -17,13 +17,13 @@ class _VarDef:
                 for t, name in iter_vd(sub_vd):
                     yield t, name
 
-        return iter_vd()
+        return iter_vd(self.vd)
 
 def parse_var_def(token_list, mod = None):
     def parse_vd():
         t = token_list.pop()
         if t.is_name:
-            return t, name
+            return t, t.value
         if not t.is_sym("("):
             t.syntax_err("需要变量定义")
         vd = []
