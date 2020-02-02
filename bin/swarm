@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+#coding=utf8
+
+import sys, os, getopt
+
+def main():
+    def _exit(msg = None):
+        if msg is not None:
+            print >> sys.stderr, msg
+            sys.exit(1)
+        sys.exit()
+
+    #定位目录
+    THIS_SCRIPT_NAME_SUFFIX = "/bin/swarm"
+    this_script_name = os.path.realpath(sys.argv[0])
+    assert this_script_name.endswith(THIS_SCRIPT_NAME_SUFFIX)
+    sw_dir = this_script_name[: -len(THIS_SCRIPT_NAME_SUFFIX)]
+    std_lib_dir = sw_dir + "/lib"
+
+    #解析命令行参数
+    try:
+        opt_list, args = getopt.getopt(sys.argv[1 :], "-v")
+    except getopt.GetoptError:
+        _exit("swarm命令的选项解析错误")
+    if not args:
+        _exit("需要主模块名")
+
+    opt_map = dict(opt_list)
+    vmode_opt = "-v" if "-v" in opt_map else ""
+    mod_file = os.path.abspath(args[0])
+    if not mod_file.endswith(".sw"):
+        _exit("脚本不是‘.sw’后缀")
+    mod_name = os.path.basename(mod_file)[: -3]
+    args = args[1 :]
+
+    out_dir = sw_dir + "/tmp/out/" + mod_name
+
+    ret = os.system("python '%s/compiler/swc.py' %s -- '%s'" % (sw_dir, vmode_opt, mod_file))
+    if ret != 0 or not os.path.isdir(out_dir):
+        _exit("swc编译失败")
+
+    exec_file = "%s/%s" % (out_dir, mod_name)
+    os.execvp(exec_file, [exec_file] + args)
+
+if __name__ == "__main__":
+    main()
