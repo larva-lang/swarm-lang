@@ -1,6 +1,6 @@
 #coding=utf8
 
-import swc_util, swc_mod
+import swc_util, swc_mod, swc_token
 
 class _VarDef:
     def __init__(self, vd, mod):
@@ -183,7 +183,7 @@ class Parser:
                     "+": "pos",
                     "-": "neg",
                 }.get(t.value, t.value)
-                parse_stk.push_op(op)
+                parse_stk._push_op(op)
                 continue
 
             if t.is_sym("("):
@@ -241,7 +241,8 @@ class Parser:
                             break
                     else:
                         #当前模块或builtin模块的name
-                        for ns in self.mod.name_set(), swc_mod.builtins_mod.public_name_set():
+                        for m in self.mod, swc_mod.builtins_mod:
+                            ns = m.public_name_set() if m is swc_mod.builtins_mod else m.name_set()
                             if name in ns:
                                 e = self._parse_mod_elem_expr(m, t, name, var_map_stk)
                                 parse_stk._push_expr(e)
@@ -305,6 +306,7 @@ class Parser:
                     obj_expr = parse_stk._pop_expr()
                     if self.token_list.peek().is_sym("("):
                         #方法调用
+                        self.token_list.pop_sym("(")
                         el = self._parse_expr_list(var_map_stk, ")")
                         parse_stk._push_expr(_Expr("call_method", (obj_expr, name, el)))
                     else:
@@ -323,7 +325,7 @@ class Parser:
             t = self.token_list.pop()
             if (t.is_sym and t.value in _BINOCULAR_OP_SET) or (t.is_reserved and t.value in ("if", "else", "is")):
                 #二、三元运算
-                parse_stk.push_op(t.value)
+                parse_stk._push_op(t.value)
             else:
                 t.syntax_err("需要二元或三元运算符")
 

@@ -94,7 +94,7 @@ func proc_8(array_1_par, array_2_par, int_par_1, int_par_2)
     {
         array_2_par[int_loc][int_idx] = int_loc;
     }
-    array_2_par[int_loc][int_loc - 1] += 1
+    array_2_par[int_loc][int_loc - 1] += 1;
     array_2_par[int_loc + 20][int_loc] = array_1_par[int_loc];
     int_glob = 5;
 }

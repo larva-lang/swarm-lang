@@ -2,7 +2,7 @@
 
 import os
 
-import swc_util, swc_token, swc_expr
+import swc_util, swc_token, swc_expr, swc_stmt
 
 mod_path = None
 
@@ -233,6 +233,10 @@ class _Cls(_ModElem):
     def _compile(self):
         for method in self.method_map.itervalues():
             method._compile()
+
+    def get_construct_method(self):
+        construct_method_name = "__init__"
+        return self.method_map[construct_method_name] if construct_method_name in self.method_map else None
 
 class _Func(_ModElem):
     def __init__(self, mod, decr_set, name_token, name, arg_map, block_token_list):

@@ -21,7 +21,6 @@ class Parser:
     def parse(self, var_map_stk, loop_deep):
         while True:
             if self.token_list.peek().is_sym("}"):
-                assert self.ccc_use_deep == top_ccc_use_deep
                 return self.stmt_list
 
             t = self.token_list.pop()
@@ -99,14 +98,14 @@ class Parser:
                 continue
 
             if t.is_reserved("var"):
-                var_def = swc_expr.parse_var_def(token_list)
+                var_def = swc_expr.parse_var_def(self.token_list)
                 self._add_lv(var_def, var_map_stk)
-                t, sym = token_list.pop_sym()
+                t, sym = self.token_list.pop_sym()
                 if sym == ";":
                     init_expr = None
                 elif sym == "=":
                     init_expr = self.expr_parser.parse(var_map_stk)
-                    token_list.pop_sym(";")
+                    self.token_list.pop_sym(";")
                 else:
                     t.syntax_err("需要‘;’或‘=’")
                 self.stmt_list.append(_Stmt("var_def", var_def = var_def, init_expr = init_expr))
@@ -144,6 +143,7 @@ class Parser:
             if sym != "=" and lvalue.op == "tuple":
                 expr_token.syntax_err("不能对多左值进行增量赋值")
             expr = self.expr_parser.parse(var_map_stk)
+            self.token_list.pop_sym(";")
             self.stmt_list.append(_Stmt("assign", lvalue = lvalue, expr = expr))
 
     def def_func_obj(self, func_obj):
@@ -151,11 +151,11 @@ class Parser:
 
     def _parse_for_prefix(self, var_map_stk):
         self.token_list.pop_sym("(")
-        t = token_list.pop()
+        t = self.token_list.pop()
         if not t.is_reserved("var"):
             t.syntax_err("需要‘var’")
         for_var_map = swc_util.OrderedDict()
-        var_def = swc_expr.parse_var_def(token_list)
+        var_def = swc_expr.parse_var_def(self.token_list)
         self._add_lv(var_def, var_map_stk + (for_var_map,))
         self.token_list.pop_sym(":")
         iter_expr = self.expr_parser.parse(var_map_stk) #iter_expr不能用for_var_map的变量
