@@ -10,3 +10,8 @@ public class range
         //todo
     }
 }
+
+public func map(it, f)
+{
+    //todo
+}
