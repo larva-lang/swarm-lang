@@ -33,11 +33,10 @@ def main():
         swc_util.exit("主模块名‘%s’不是一个合法标识符" % main_mod_name)
 
     #模块查找路径
-    swc_mod.set_mod_path([os.path.dirname(main_mod_file), sw_dir + "/lib"])
+    swc_mod.mod_path = [os.path.dirname(main_mod_file), sw_dir + "/lib"]
 
     #目标输出路径
-    swc_out.set_main_mod_name(main_mod_name)
-    swc_out.set_out_dir("%s/tmp/out/%s" % (sw_dir, main_mod_name))
+    swc_out.out_dir = "%s/tmp/out/%s" % (sw_dir, main_mod_name)
 
     swc_mod.precompile(main_mod_name)
 
