@@ -43,3 +43,5 @@ class Mod:
         "todo"
         print self.src_fn
         print token_list
+        while token_list:
+            print token_list.pop()

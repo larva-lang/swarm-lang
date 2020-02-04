@@ -207,6 +207,7 @@ class Parser:
     def __init__(self, src_fn):
         self.src_fn = src_fn
         self.line_idx = None
+        self.line = None
         self.pos = None
 
     def _syntax_err(self, msg):
@@ -272,9 +273,9 @@ class Parser:
 
         return "".join(l)
 
-    def _parse_token(self, line):
+    def _parse_token(self):
         token_pos = self.pos
-        s = line[token_pos :]
+        s = self.line[token_pos :]
         m = _TOKEN_RE.match(s)
         if m is None:
             _syntax_err(self, "词法错误")
@@ -342,27 +343,27 @@ class Parser:
 
         swc_util.abort()
 
-    def _parse_line(self, line):
+    def _parse_line(self):
         token_list = [] #因为是临时解析的一个token列表，需要做分析合并等操作，简单起见直接用list
         uncompleted_comment_start_pos = None
         raw_str = None
 
         #解析当前行token
-        while self.pos < len(line):
+        while self.pos < len(self.line):
             #跳过空格
-            while self.pos < len(line) and line[self.pos] in "\t\x20":
+            while self.pos < len(self.line) and self.line[self.pos] in "\t\x20":
                 self.pos += 1
-            if self.pos >= len(line):
+            if self.pos >= len(self.line):
                 #行结束
                 break
 
-            if line[self.pos : self.pos + 2] == "//":
+            if self.line[self.pos : self.pos + 2] == "//":
                 #单行注释，略过本行
                 break
-            if line[self.pos : self.pos + 2] == "/*":
+            if self.line[self.pos : self.pos + 2] == "/*":
                 #块注释
                 self.pos += 2
-                comment_end_pos = line[self.pos :].find("*/")
+                comment_end_pos = self.line[self.pos :].find("*/")
                 if comment_end_pos < 0:
                     #注释跨行了，设置标记略过本行
                     uncompleted_comment_start_pos = self.pos - 2
@@ -370,17 +371,17 @@ class Parser:
                 #注释在本行结束，跳过它
                 self.pos += comment_end_pos + 2
                 continue
-            if line[self.pos] == "`":
+            if self.line[self.pos] == "`":
                 #原始字符串
                 raw_str = _RawStr("", self.src_fn, self.line_idx, self.pos)
                 self.pos += 1
-                raw_str_end_pos = line[self.pos :].find("`")
+                raw_str_end_pos = self.line[self.pos :].find("`")
                 if raw_str_end_pos < 0:
                     #跨行了，追加内容并进行下一行
-                    raw_str.value += line[self.pos :] + "\n"
+                    raw_str.value += self.line[self.pos :] + "\n"
                     break
                 #在本行结束
-                raw_str.value += line[self.pos : self.pos + raw_str_end_pos]
+                raw_str.value += self.line[self.pos : self.pos + raw_str_end_pos]
                 raw_str.check()
                 token_list.append(_Token("literal_str", raw_str.value, raw_str.src_fn, raw_str.line_idx, raw_str.pos))
                 self.pos += raw_str_end_pos + 1
@@ -388,7 +389,7 @@ class Parser:
                 continue
 
             #解析token
-            token = self._parse_token(line)
+            token = self._parse_token()
             token_list.append(token)
 
         return token_list, uncompleted_comment_start_pos, raw_str
@@ -400,8 +401,8 @@ class Parser:
         in_comment = False
         raw_str = None
         native_code = None
-        for self.line_idx, line in enumerate(line_list):
-            for self.pos, c in enumerate(line):
+        for self.line_idx, self.line in enumerate(line_list):
+            for self.pos, c in enumerate(self.line):
                 assert c not in ("\r", "\n")
                 if ord(c) < 32 and c not in ("\t",):
                     _syntax_err(self, "含有非法的ascii控制码‘%r’" % c)
@@ -409,7 +410,7 @@ class Parser:
 
             if in_comment:
                 #有未完的注释
-                pos = line.find("*/")
+                pos = self.line.find("*/")
                 if pos < 0:
                     #整行都是注释，忽略
                     continue
@@ -417,32 +418,32 @@ class Parser:
                 in_comment = False
             elif raw_str is not None:
                 #有未完的原始字符串
-                pos = line.find("`")
+                pos = self.line.find("`")
                 if pos < 0:
                     #整行都是字符串内容，追加
-                    raw_str.value += line + "\n"
+                    raw_str.value += self.line + "\n"
                     continue
                 #在本行结束
-                raw_str.value += line[: pos]
+                raw_str.value += self.line[: pos]
                 raw_str.check()
                 token_list._append(_Token("literal_str", raw_str.value, raw_str.src_fn, raw_str.line_idx, raw_str.pos))
                 self.pos = pos + 1
                 raw_str = None
             elif native_code is not None:
-                if line.strip() == "!>>":
+                if self.line.strip() == "!>>":
                     #native code结束
                     token_list._append(_Token("native_code", native_code.line_list, native_code.src_fn, native_code.line_idx, native_code.pos))
                     native_code = None
                 else:
-                    native_code.line_list.append(line)
+                    native_code.line_list.append(self.line)
                 continue
             else:
-                if line.strip() == "!<<":
+                if self.line.strip() == "!<<":
                     #native code开始
-                    native_code = _NativeCode(self.src_fn, self.line_idx, line.find("!<<"))
+                    native_code = _NativeCode(self.src_fn, self.line_idx, self.line.find("!<<"))
                     continue
 
-            line_tl, uncompleted_comment_start_pos, raw_str = self._parse_line(line)
+            line_tl, uncompleted_comment_start_pos, raw_str = self._parse_line()
             for t in line_tl:
                 token_list._append(t)
             if uncompleted_comment_start_pos is not None:
