@@ -7,7 +7,7 @@ class _VarDef:
         self.vd     = vd
         self.mod    = mod
 
-    def name_iter(self):
+    def iter_names(self):
         def iter_vd(vd):
             if isinstance(vd, tuple):
                 yield vd

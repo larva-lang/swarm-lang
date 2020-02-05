@@ -123,7 +123,7 @@ class _NativeCode:
 class _Attr:
     def __init__(self, cls, decr_set, name_token, name):
         self.cls        = cls
-        self.decr_set   = decr_set
+        self.is_public  = "public" in decr_set
         self.name_token = name_token
         self.name       = name
 
@@ -132,7 +132,7 @@ class _Attr:
 class _Method:
     def __init__(self, cls, decr_set, name_token, name, arg_map, block_token_list):
         self.cls        = cls
-        self.decr_set   = decr_set
+        self.is_public  = "public" in decr_set
         self.name_token = name_token
         self.name       = name
         self.arg_map    = arg_map
@@ -145,7 +145,7 @@ class _Method:
 class _Cls:
     def __init__(self, mod, decr_set, name_token, name):
         self.mod        = mod
-        self.decr_set   = decr_set
+        self.is_public  = "public" in decr_set
         self.name_token = name_token
         self.name       = name
 
@@ -212,7 +212,7 @@ class _Cls:
 class _Func:
     def __init__(self, mod, decr_set, name_token, name, arg_map, block_token_list):
         self.mod        = mod
-        self.decr_set   = decr_set
+        self.is_public  = "public" in decr_set
         self.name_token = name_token
         self.name       = name
         self.arg_map    = arg_map
@@ -225,7 +225,8 @@ class _Func:
 class _Gv:
     def __init__(self, mod, decr_set, name_token, name):
         self.mod        = mod
-        self.decr_set   = decr_set
+        self.is_public  = "public" in decr_set
+        self.is_final   = "final" in decr_set
         self.name_token = name_token
         self.name       = name
 
@@ -253,6 +254,7 @@ class Mod:
         self.gv_init_list   = []
 
         self._precompile()
+        self._check_name_conflict()
 
     __repr__ = __str__ = lambda self : self.name
 
@@ -350,7 +352,7 @@ class Mod:
 
     def _parse_gv(self, decr_set, token_list):
         var_def = swc_expr.parse_var_def(token_list)
-        for t, name in var_def.name_iter():
+        for t, name in var_def.iter_names():
             self._check_redefine(t, name)
             self.gv_map[name] = _Gv(self, decr_set, t, name)
         t = token_list.pop()
@@ -369,3 +371,44 @@ class Mod:
         for i in self.cls_map, self.func_map, self.gv_map:
             if name in i:
                 t.syntax_err("名字重定义")
+
+    def iter_mod_elems(self):
+        for m in self.cls_map, self.func_map, self.gv_map:
+            for elem in m.itervalues():
+                yield elem
+
+    def public_name_set(self):
+        name_set = set()
+        for elem in self.iter_mod_elems():
+            if elem.is_public:
+                name_set.add(elem.name)
+        return name_set
+
+    def name_set(self):
+        name_set = set()
+        for elem in self.iter_mod_elems():
+            name_set.add(elem.name)
+        return name_set
+
+    def _check_name_conflict(self):
+        builtins_name_set = set() if builtins_mod is None else builtins_mod.public_name_set()
+
+        #检查当前模块和内建模块的public名字是否有冲突，给出警告
+        for elem in self.iter_mod_elems():
+            if elem.name in builtins_name_set:
+                elem.name_token.warn("‘%s’在所在模块中隐藏了同名内建元素" % elem)
+
+        #检查所有方法和函数的参数名的冲突问题
+        def arg_maps():
+            for cls in self.cls_map.itervalues():
+                for method in cls.method_map.itervalues():
+                    yield method.arg_map
+            for func in self.func_map.itervalues():
+                yield func.arg_map
+        mod_name_set = self.name_set()
+        for arg_map in arg_maps():
+            for name, t in arg_map.iteritems():
+                if name in mod_name_set:
+                    t.syntax_err("参数‘%s’和‘%s.%s’名字冲突" % (name, self, name))
+                if name in builtins_name_set:
+                    t.warn("参数‘%s’在所在函数或方法中隐藏了同名内建元素" % name)
