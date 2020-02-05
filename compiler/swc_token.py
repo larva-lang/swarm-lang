@@ -161,11 +161,11 @@ class _TokenList:
             if sym is None:
                 t.syntax_err("需要符号")
             else:
-                t.syntax_err("需要符号'%s'" % sym)
+                t.syntax_err("需要符号‘%s’" % sym)
         if sym is None:
             return t, t.value
         if t.value != sym:
-            t.syntax_err("需要'%s'" % sym)
+            t.syntax_err("需要‘%s’" % sym)
         return t
 
     def pop_name(self):
@@ -296,7 +296,7 @@ class Parser:
                     if math.isnan(value) or math.isinf(value):
                         raise ValueError
                 except ValueError:
-                    _syntax_err(self, "非法的浮点字面量'%s'" % f)
+                    _syntax_err(self, "非法的浮点字面量‘%s’" % f)
                 return _Token("literal_float", value, self.src_fn, self.line_idx, token_pos)
 
             if sym is not None:
@@ -319,15 +319,15 @@ class Parser:
                     if i[-1] in ("u", "U"):
                         value = int(i[: -1], 0)
                         if value >= 2 ** 64:
-                            _syntax_err(self, "过大的uint字面量'%s'" % i)
+                            _syntax_err(self, "过大的uint字面量‘%s’" % i)
                         type = "uint"
                     else:
                         value = int(i, 0)
                         if value >= 2 ** 63:
-                            _syntax_err(self, "过大的int字面量'%s'" % i)
+                            _syntax_err(self, "过大的int字面量‘%s’" % i)
                         type = "int"
                 except ValueError:
-                    _syntax_err(self, "非法的整数字面量'%s'" % i)
+                    _syntax_err(self, "非法的整数字面量‘%s’" % i)
                 return _Token("literal_" + type, value, self.src_fn, self.line_idx, token_pos)
 
             if w is not None:
@@ -482,3 +482,19 @@ class _NativeCode:
 
 def is_valid_name(name):
     return re.match("^[a-zA-Z_]\w*$", name) is not None and name not in _RESERVED_WORD_SET
+
+def parse_token_list_until_sym(token_list, end_sym_set):
+    bracket_map = {"(" : ")", "[" : "]", "{" : "}"}
+    sub_token_list = _TokenList(token_list.src_file)
+    stk = []
+    while True:
+        t = token_list.pop()
+        sub_token_list.append(t)
+        if t.is_sym and t.value in end_sym_set and not stk:
+            return sub_token_list, t.value
+        if t.is_sym and t.value in bracket_map:
+            stk.append(t)
+        if t.is_sym and t.value in bracket_map.values():
+            if not (stk and stk[-1].is_sym and t.value == bracket_map.get(stk[-1].value)):
+                t.syntax_err("未匹配的'%s'" % t.value)
+            stk.pop()
