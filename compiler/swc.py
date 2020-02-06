@@ -39,6 +39,7 @@ def main():
     swc_out.out_dir = "%s/tmp/out/%s" % (sw_dir, main_mod_name)
 
     swc_mod.precompile(main_mod_name)
+    swc_mod.compile()
 
     #todo
 

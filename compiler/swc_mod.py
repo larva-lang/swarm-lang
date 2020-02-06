@@ -60,6 +60,12 @@ def precompile(main_mod_name):
         compiling_set = new_compiling_set
     assert mod_map.value_at(0) is builtins_mod
 
+    main_mod._check_main_func()
+
+def compile():
+    for m in mod_map.itervalues():
+        m._compile()
+
 class _NativeCode:
     def __init__(self, mod, t):
         self.mod = mod
@@ -142,6 +148,12 @@ class _Method:
 
     __repr__ = __str__ = lambda self : "%s.%s" % (self.cls, self.name)
 
+    def _compile(self):
+        self.stmt_list = swc_stmt.Parser(self.block_token_list, self.cls.mod, self.cls, self).parse((self.arg_map.copy(),), 0) #todo
+        self.block_token_list.pop_sym("}")
+        assert not self.block_token_list
+        del self.block_token_list
+
 class _Cls:
     def __init__(self, mod, decr_set, name_token, name):
         self.mod        = mod
@@ -149,9 +161,9 @@ class _Cls:
         self.name_token = name_token
         self.name       = name
 
-        self.nc_list            = []
-        self.attr_map           = swc_util.OrderedDict()
-        self.method_map         = swc_util.OrderedDict()
+        self.nc_list    = []
+        self.attr_map   = swc_util.OrderedDict()
+        self.method_map = swc_util.OrderedDict()
 
     __repr__ = __str__ = lambda self : "%s.%s" % (self.mod, self.name)
 
@@ -209,6 +221,10 @@ class _Cls:
             if name in i:
                 t.syntax_err("属性或方法名重定义")
 
+    def _compile(self):
+        for method in self.method_map.itervalues():
+            method._compile()
+
 class _Func:
     def __init__(self, mod, decr_set, name_token, name, arg_map, block_token_list):
         self.mod        = mod
@@ -222,6 +238,12 @@ class _Func:
 
     __repr__ = __str__ = lambda self : "%s.%s" % (self.mod, self.name)
 
+    def _compile(self):
+        self.stmt_list = swc_stmt.Parser(self.block_token_list, self.mod, None, self).parse((self.arg_map.copy(),), 0) #todo
+        self.block_token_list.pop_sym("}")
+        assert not self.block_token_list
+        del self.block_token_list
+
 class _Gv:
     def __init__(self, mod, decr_set, name_token, name):
         self.mod        = mod
@@ -233,12 +255,18 @@ class _Gv:
     __repr__ = __str__ = lambda self : "%s.%s" % (self.mod, self.name)
 
 class _GvInit:
-    def __init__(self, mod, var_def, block_token_list):
+    def __init__(self, mod, var_def, expr_token_list):
         self.mod        = mod
         self.var_def    = var_def
 
-        self.block_token_list   = block_token_list
+        self.expr_token_list    = expr_token_list
         self.expr               = None
+
+    def _compile(self):
+        self.expr = swc_expr.Parser(self.expr_token_list, self.mod, None, None).parse(())
+        self.expr_token_list.pop_sym(";")
+        assert not self.expr_token_list
+        del self.expr_token_list
 
 class Mod:
     def __init__(self, mn):
@@ -408,7 +436,25 @@ class Mod:
         mod_name_set = self.name_set()
         for arg_map in arg_maps():
             for name, t in arg_map.iteritems():
+                if name in self.dep_mod_set:
+                    t.syntax_err("参数‘%s’和导入模块的名字冲突" % (name))
                 if name in mod_name_set:
                     t.syntax_err("参数‘%s’和‘%s.%s’名字冲突" % (name, self, name))
                 if name in builtins_name_set:
                     t.warn("参数‘%s’在所在函数或方法中隐藏了同名内建元素" % name)
+
+    def _check_main_func(self):
+        if "main" not in self.func_map:
+            swc_util.exit("主模块‘%s’没有main函数" % self)
+        main_func = self.func_map["main"]
+        if not main_func.is_public:
+            swc_util.exit("主模块‘%s’的main函数必须是public的" % self)
+        if len(main_func.arg_map) != 0:
+            swc_util.exit("主模块‘%s’的main函数不能有参数" % self)
+
+    def _compile(self):
+        for m in self.cls_map, self.func_map:
+            for elem in m.itervalues():
+                elem._compile()
+        for gi in self.gv_init_list:
+            gi._compile()
