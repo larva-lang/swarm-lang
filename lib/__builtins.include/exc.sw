@@ -16,7 +16,7 @@ public func handle_exc(handler)
     l_tb    = sw_str_from_go_str(c.tb)
     !>>
 
-    handler.call(exc, tb)
+    handler.call(exc, tb);
 }
 
 !<<

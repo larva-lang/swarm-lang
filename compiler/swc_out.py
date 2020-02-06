@@ -150,7 +150,7 @@ def _output_main_pkg():
         with code.new_blk("import"):
             code += '"%s"' % _prog_pkg_name
         with code.new_blk("func main()"):
-            code += "%s.%s()" % (_prog_pkg_name, _BOOTER_START_PROC_FUNC_NAME)
+            code += "%s.%s()" % (_prog_pkg_name, _BOOTER_START_PROG_FUNC_NAME)
 
 def _output_booter():
     with _Code("%s/%s.booter.go" % (_out_prog_dir, _prog_pkg_name)) as code:
