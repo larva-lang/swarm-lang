@@ -156,7 +156,7 @@ class _Method:
     __repr__ = __str__ = lambda self : "%s.%s" % (self.cls, self.name)
 
     def _compile(self):
-        self.stmt_list = swc_stmt.Parser(self.block_token_list, self.cls.mod, self.cls, self).parse((self.arg_map.copy(),), 0) #todo
+        self.stmt_list = swc_stmt.Parser(self.block_token_list, self.cls.mod, self.cls, self).parse((self.arg_map.copy(),), 0)
         self.block_token_list.pop_sym("}")
         assert not self.block_token_list
         del self.block_token_list
@@ -250,7 +250,7 @@ class _Func(_ModElem):
     __repr__ = __str__ = lambda self : "%s.%s" % (self.mod, self.name)
 
     def _compile(self):
-        self.stmt_list = swc_stmt.Parser(self.block_token_list, self.mod, None, self).parse((self.arg_map.copy(),), 0) #todo
+        self.stmt_list = swc_stmt.Parser(self.block_token_list, self.mod, None, self).parse((self.arg_map.copy(),), 0)
         self.block_token_list.pop_sym("}")
         assert not self.block_token_list
         del self.block_token_list
@@ -514,7 +514,7 @@ def parse_func_obj(func_token, token_list, mod, cls, var_map_stk):
     func_obj = _FuncObj(mod, func_token, arg_map)
 
     token_list.pop_sym("{")
-    func_obj.stmt_list = swc_stmt.Parser(token_list, mod, cls, func_obj).parse(var_map_stk + (arg_map.copy(),), 0) #todo
+    func_obj.stmt_list = swc_stmt.Parser(token_list, mod, cls, func_obj).parse(var_map_stk + (arg_map.copy(),), 0)
     token_list.pop_sym("}")
 
     func_objs.append(func_obj)

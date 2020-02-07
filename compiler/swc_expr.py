@@ -69,8 +69,9 @@ class _Expr:
         self.op     = op
         self.arg    = arg
 
-        self.is_lvalue  = op in ("gv", "lv", "[]", ".")
-        self.pos_info   = None #位置信息，只有在解析栈finish时候才会被赋值为解析栈的开始位置，参考相关代码，主要用于output时候的代码位置映射构建
+        self.is_lvalue = op in ("gv", "lv", "[]", ".") or (op == "tuple" and all([elem.is_lvalue for elem in arg]))
+
+        self.pos_info = None #位置信息，只有在解析栈finish时候才会被赋值为解析栈的开始位置，参考相关代码，主要用于output时候的代码位置映射构建
 
 class _ParseStk:
     #解析表达式时使用的栈

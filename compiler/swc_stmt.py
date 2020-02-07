@@ -1,6 +1,6 @@
 #coding=utf8
 
-import swc_util, swc_expr, swc_mod
+import swc_util, swc_expr, swc_mod, swc_token
 
 class _Stmt:
     def __init__(self, type, **kw_arg):
@@ -100,26 +100,16 @@ class Parser:
 
             if t.is_reserved("var"):
                 var_def = swc_expr.parse_var_def(token_list)
-                new_vars = []
-                for t, name in var_def.iter_names():
-                    if name in var_map_stk[-1]:
-                        t.syntax_err("局部变量‘%s’重定义")
-                    for var_map in var_map_stk[: -1]:
-                        if name in var_map:
-                            t.syntax_err("局部变量‘%s’和上层局部变量名字冲突")
-                    swc_mod.check_lv_name_conflict(name, t, self.mod)
-                    var_map_stk[-1][name] = t
-                    new_vars.append(name)
-                self.stmt_list.append(_Stmt("var_def", vars = new_vars))
-                t = token_list.pop()
-                if t.is_sym(";"):
-                    #无初始化
-                    continue
-                if not t.is_sym("="):
+                self._add_lv(var_def, var_map_stk)
+                t, sym = token_list.pop_sym()
+                if sym == ";":
+                    init_expr = None
+                elif sym == "=":
+                    init_expr = self.expr_parser.parse(var_map_stk)
+                    token_list.pop_sym(";")
+                else:
                     t.syntax_err("需要‘;’或‘=’")
-                init_expr = self.expr_parser.parse(var_map_stk)
-                token_list.pop_sym(";")
-                self.stmt_list.append(_Stmt("var_init", var_def = var_def, init_expr = init_expr))
+                self.stmt_list.append(_Stmt("var_def", var_def = var_def, init_expr = init_expr))
                 continue
 
             if t.is_reserved("defer"):
@@ -131,13 +121,53 @@ class Parser:
                 continue
 
             if t.is_native_code:
-                stmt_list.append(_Stmt("native_code", native_code = swc_mod.NativeCode(self.mod, t), fom = self.fom))
+                self.stmt_list.append(_Stmt("native_code", native_code = swc_mod.NativeCode(self.mod, t), fom = self.fom))
                 continue
 
             if t.is_reserved("else"):
                 t.syntax_err("未匹配if的else")
 
-            todo
+            self.token_list.revert()
+
+            expr_token = self.token_list.peek()
+            expr = self.expr_parser.parse(var_map_stk)
+            t, sym = self.token_list.pop_sym()
+            if sym == ";":
+                self.stmt_list.append(_Stmt("expr", expr = expr))
+                continue
+            if sym not in swc_token.ASSIGN_SYM_SET:
+                t.syntax_err("需要‘;’或赋值")
+
+            lvalue = expr
+            if not lvalue.is_lvalue:
+                expr_token.syntax_err("需要左值")
+            if sym != "=" and lvalue.op == "tuple":
+                expr_token.syntax_err("不能对多左值进行增量赋值")
+            expr = self.expr_parser.parse(var_map_stk)
+            self.stmt_list.append(_Stmt("assign", lvalue = lvalue, expr = expr))
 
     def def_func_obj(self, func_obj):
         self.stmt_list.append(_Stmt("def_func_obj", func_obj = func_obj))
+
+    def _parse_for_prefix(self, var_map_stk):
+        self.token_list.pop_sym("(")
+        t = token_list.pop()
+        if not t.is_reserved("var"):
+            t.syntax_err("需要‘var’")
+        for_var_map = swc_util.OrderedDict()
+        var_def = swc_expr.parse_var_def(token_list)
+        self._add_lv(var_def, var_map_stk + (for_var_map,))
+        self.token_list.pop_sym(":")
+        iter_expr = self.expr_parser.parse(var_map_stk) #iter_expr不能用for_var_map的变量
+        self.token_list.pop_sym(")")
+        return for_var_map, iter_expr
+
+    def _add_lv(self, var_def, var_map_stk):
+        for t, name in var_def.iter_names():
+            if name in var_map_stk[-1]:
+                t.syntax_err("局部变量‘%s’重定义")
+            for var_map in var_map_stk[: -1]:
+                if name in var_map:
+                    t.syntax_err("局部变量‘%s’和上层局部变量名字冲突")
+            swc_mod.check_lv_name_conflict(name, t, self.mod)
+            var_map_stk[-1][name] = t
