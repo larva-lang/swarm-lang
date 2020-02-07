@@ -66,7 +66,7 @@ def compile():
     for m in mod_map.itervalues():
         m._compile()
 
-class _NativeCode:
+class NativeCode:
     def __init__(self, mod, t):
         self.mod = mod
         self.t = t
@@ -126,6 +126,13 @@ class _NativeCode:
                 token.syntax_err("非法的标识符宏")
             result.append((mod_name, name))
 
+class _ModElem:
+    def __init__(self):
+        self.is_cls     = isinstance(self, _Cls)
+        self.is_func    = isinstance(self, _Func)
+        self.is_gv      = isinstance(self, _Gv)
+        assert [self.is_cls, self.is_func, self.is_gv].count(True) == 1
+
 class _Attr:
     def __init__(self, cls, decr_set, name_token, name):
         self.cls        = cls
@@ -154,8 +161,10 @@ class _Method:
         assert not self.block_token_list
         del self.block_token_list
 
-class _Cls:
+class _Cls(_ModElem):
     def __init__(self, mod, decr_set, name_token, name):
+        _ModElem.__init__(self)
+
         self.mod        = mod
         self.is_public  = "public" in decr_set
         self.name_token = name_token
@@ -175,7 +184,7 @@ class _Cls:
 
             if t.is_native_code:
                 token_list.pop()
-                self.nc_list.append(_NativeCode(self.mod, t))
+                self.nc_list.append(NativeCode(self.mod, t))
                 continue
 
             #解析修饰
@@ -225,8 +234,10 @@ class _Cls:
         for method in self.method_map.itervalues():
             method._compile()
 
-class _Func:
+class _Func(_ModElem):
     def __init__(self, mod, decr_set, name_token, name, arg_map, block_token_list):
+        _ModElem.__init__(self)
+
         self.mod        = mod
         self.is_public  = "public" in decr_set
         self.name_token = name_token
@@ -244,8 +255,10 @@ class _Func:
         assert not self.block_token_list
         del self.block_token_list
 
-class _Gv:
+class _Gv(_ModElem):
     def __init__(self, mod, decr_set, name_token, name):
+        _ModElem.__init__(self)
+
         self.mod        = mod
         self.is_public  = "public" in decr_set
         self.is_final   = "final" in decr_set
@@ -270,6 +283,8 @@ class _GvInit:
 
 class Mod:
     def __init__(self, mn):
+        self.id = swc_util.new_id()
+
         self.name = mn
         self.src_fn = self._find_mod_file()
 
@@ -315,7 +330,7 @@ class Mod:
             #解析global域的native_code
             if t.is_native_code:
                 token_list.pop()
-                self.gnc_list.append(_NativeCode(self, t))
+                self.gnc_list.append(NativeCode(self, t))
                 continue
 
             #解析修饰
@@ -405,9 +420,17 @@ class Mod:
             for elem in m.itervalues():
                 yield elem
 
+    def get_elem(self, name):
+        for elem in self.iter_mod_elems():
+            if elem.name == name:
+                return elem
+        else:
+            return None
+
     def public_name_set(self):
         name_set = set()
         for elem in self.iter_mod_elems():
+            assert elem.name not in name_set
             if elem.is_public:
                 name_set.add(elem.name)
         return name_set
@@ -415,6 +438,7 @@ class Mod:
     def name_set(self):
         name_set = set()
         for elem in self.iter_mod_elems():
+            assert elem.name not in name_set
             name_set.add(elem.name)
         return name_set
 
@@ -436,12 +460,7 @@ class Mod:
         mod_name_set = self.name_set()
         for arg_map in arg_maps():
             for name, t in arg_map.iteritems():
-                if name in self.dep_mod_set:
-                    t.syntax_err("参数‘%s’和导入模块的名字冲突" % (name))
-                if name in mod_name_set:
-                    t.syntax_err("参数‘%s’和‘%s.%s’名字冲突" % (name, self, name))
-                if name in builtins_name_set:
-                    t.warn("参数‘%s’在所在函数或方法中隐藏了同名内建元素" % name)
+                check_lv_name_conflict(name, t, self)
 
     def _check_main_func(self):
         if "main" not in self.func_map:
@@ -458,3 +477,46 @@ class Mod:
                 elem._compile()
         for gi in self.gv_init_list:
             gi._compile()
+
+def check_lv_name_conflict(name, t, mod):
+    if name in mod.dep_mod_set:
+        t.syntax_err("‘%s’和导入模块的名字冲突" % (name))
+    if name in mod.name_set():
+        t.syntax_err("‘%s’和‘%s.%s’名字冲突" % (name, self, name))
+    builtins_name_set = set() if (builtins_mod is None or mod is builtins_mod) else builtins_mod.public_name_set()
+    if name in builtins_name_set:
+        t.warn("‘%s’在所在函数或方法中隐藏了同名内建元素" % name)
+
+#swarm的函数对象比较简单统一，没必要和模块有从属关系，独立出来
+
+class _FuncObj:
+    def __init__(self, mod, func_token, arg_map):
+        self.id = swc_util.new_id()
+
+        self.mod        = mod
+        self.func_token = func_token
+        self.arg_map    = arg_map
+        self.stmt_list  = None
+
+    __repr__ = __str__ = lambda self: "func_obj[%s:%s:%s]" % (self.mod, self.func_token.line_idx + 1, self.func_token.pos + 1)
+
+func_objs = []
+
+def parse_func_obj(func_token, token_list, mod, cls, var_map_stk):
+    assert func_token.is_reserved("func")
+
+    token_list.pop_sym("(")
+    arg_map = _parse_arg_map(token_list)
+    token_list.pop_sym(")")
+    for name, t in arg_map.iteritems():
+        check_lv_name_conflict(name, t, mod)
+
+    func_obj = _FuncObj(mod, func_token, arg_map)
+
+    token_list.pop_sym("{")
+    func_obj.stmt_list = swc_stmt.Parser(token_list, mod, cls, func_obj).parse(var_map_stk + (arg_map.copy(),), 0) #todo
+    token_list.pop_sym("}")
+
+    func_objs.append(func_obj)
+
+    return func_obj

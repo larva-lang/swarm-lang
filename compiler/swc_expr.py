@@ -116,15 +116,15 @@ class _ParseStk:
             #单目运算符
             if len(self.stk) < 1:
                 self.start_token.syntax_err("非法的表达式")
-            self.stk.append(_Expr(op, self.stk.pop()))
+            self._push_expr(_Expr(op, self._pop_expr()))
 
         elif op in _BINOCULAR_OP_SET:
             #双目运算符
             if len(self.stk) < 2:
                 self.start_token.syntax_err("非法的表达式")
-            eb = self.stk.pop()
-            ea = self.stk.pop()
-            self.stk.append(_Expr(op, (ea, eb)))
+            eb = self._pop_expr()
+            ea = self._pop_expr()
+            self._push_expr(_Expr(op, (ea, eb)))
 
         elif op == "if":
             self.start_token.syntax_err("非法的表达式，存在未匹配'else'的'if'")
@@ -133,23 +133,26 @@ class _ParseStk:
             #三元运算符
             if len(self.stk) < 3:
                 self.start_token.syntax_err("非法的表达式")
-            eb = self.stk.pop()
-            e_cond = self.stk.pop()
-            ea = self.stk.pop()
-            self.stk.append(_Expr(op, (e_cond, ea, eb)))
+            eb = self._pop_expr()
+            e_cond = self._pop_expr()
+            ea = self._pop_expr()
+            self._push_expr(_Expr(op, (e_cond, ea, eb)))
 
         else:
-            raise Exception("Bug")
+            swc_util.abort()
 
-    def push_expr(self, e):
+    def _push_expr(self, e):
         self.stk.append(e)
+
+    def _pop_expr(self):
+        return self.stk.pop()
 
     def finish(self):
         while self.op_stk:
             self._pop_top_op()
         if len(self.stk) != 1:
             self.start_token.syntax_err("非法的表达式")
-        e = self.stk.pop()
+        e = self._pop_expr()
         e.pos_info = self.start_token, self.fom
         return e
 
@@ -160,11 +163,12 @@ def _is_expr_end(t):
     return False
 
 class Parser:
-    def __init__(self, token_list, mod, cls, fom):
-        self.token_list = token_list
-        self.mod        = mod
-        self.cls        = cls
-        self.fom        = fom
+    def __init__(self, token_list, mod, cls, fom, stmt_parser):
+        self.token_list     = token_list
+        self.mod            = mod
+        self.cls            = cls
+        self.fom            = fom
+        self.stmt_parser    = stmt_parser
 
     def parse(self, var_map_stk):
         start_token = self.token_list.peek()
@@ -187,42 +191,18 @@ class Parser:
                 t = self.token_list.pop()
                 if t.is_sym(")"):
                     #子表达式
-                    parse_stk.push_expr(e)
+                    parse_stk._push_expr(e)
                 elif t.is_sym(","):
                     #tuple
-                    el = [e]
-                    while True:
-                        if self.token_list.peek().is_sym(")"):
-                            self.token_list.pop()
-                            break
-                        e = self.parse(var_map_stk)
-                        el.append(e)
-                        t, sym = self.token_list.pop_sym()
-                        if sym == ",":
-                            continue
-                        if sym == ")":
-                            break
-                        t.syntax_err("需要‘,’或‘)’")
-                    parse_stk.push_expr(_Expr("tuple", el))
+                    el = [e] + self._parse_expr_list(var_map_stk, ")")
+                    parse_stk._push_expr(_Expr("tuple", el))
                 else:
                     t.syntax_err("需要‘,’或‘)’")
 
             elif t.is_sym("["):
                 #list
-                el = []
-                while True:
-                    if self.token_list.peek().is_sym("]"):
-                        self.token_list.pop()
-                        break
-                    e = self.parse(var_map_stk)
-                    el.append(e)
-                    t, sym = self.token_list.pop_sym()
-                    if sym == ",":
-                        continue
-                    if sym == "]":
-                        break
-                    t.syntax_err("需要‘,’或‘]’")
-                parse_stk.push_expr(_Expr("list", el))
+                el = self._parse_expr_list(var_map_stk, "]")
+                parse_stk._push_expr(_Expr("list", el))
 
             elif t.is_sym("{"):
                 #dict
@@ -241,7 +221,7 @@ class Parser:
                     if sym == "}":
                         break
                     t.syntax_err("需要‘,’或‘}’")
-                parse_stk.push_expr(_Expr("dict", kvel))
+                parse_stk._push_expr(_Expr("dict", kvel))
 
             elif t.is_name:
                 #name
@@ -251,36 +231,43 @@ class Parser:
                     self.token_list.pop_sym(".")
                     t, name = self.token_list.pop_name()
                     e = self._parse_mod_elem_expr(m, t, name, var_map_stk)
-                    parse_stk.push_expr(e)
+                    parse_stk._push_expr(e)
                 else:
                     for var_map in reversed(var_map_stk):
                         if name in var_map:
                             #局部变量
-                            parse_stk.push_expr(_Expr("lv", name))
+                            parse_stk._push_expr(_Expr("lv", name))
                             break
                     else:
                         #当前模块或builtin模块的name
                         for ns in self.mod.name_set(), swc_mod.builtins_mod.public_name_set():
                             if name in ns:
                                 e = self._parse_mod_elem_expr(m, t, name, var_map_stk)
-                                parse_stk.push_expr(e)
+                                parse_stk._push_expr(e)
                                 break
                         else:
                             t.syntax_err("未定义的标识符'%s'" % name)
 
             elif t.is_literal:
                 #literal
-                parse_stk.push_expr(_Expr("literal", t))
+                e = _Expr("literal", t)
+                if t.is_literal("str") and self.token_list.peek().is_sym(".") and self.token_list.peek(1).is_sym("("):
+                    #字符串字面量的format语法
+                    fmt, el = self._parse_str_format(var_map_stk, t)
+                    e = _Expr("str_format", (fmt, el))
+                parse_stk._push_expr(e)
 
             elif t.is_reserved("this"):
                 #this
                 if self.cls is None:
                     t.syntax_err("‘this’只能用于方法中")
-                parse_stk.push_expr(_Expr("this", t))
+                parse_stk._push_expr(_Expr("this", t))
 
             elif t.is_reserved("func"):
-                #函数
-                todo
+                #函数对象
+                func_obj = swc_mod.parse_func_obj(t, self.token_list, self.mod, self.cls, var_map_stk)
+                self.stmt_parser.def_func_obj(func_obj)
+                parse_stk._push_expr(_Expr("func_obj", func_obj))
 
             else:
                 t.syntax_err("非法的表达式")
@@ -292,10 +279,36 @@ class Parser:
                 t = self.token_list.pop()
 
                 if t.is_sym("["):
-                    todo
+                    is_slice = False
+                    if self.token_list.peek().is_sym(":"):
+                        expr = None
+                        is_slice = True
+                    else:
+                        expr = self.parse(var_map_stk)
+                    if self.token_list.peek().is_sym(":"):
+                        self.token_list.pop_sym(":")
+                        if self.token_list.peek().is_sym("]"):
+                            slice_end_expr = None
+                        else:
+                            slice_end_expr = self.parse(var_map_stk)
+                        is_slice = True
+                    self.token_list.pop_sym("]")
+                    obj_expr = parse_stk._pop_expr()
+                    if is_slice:
+                        parse_stk._push_expr(_Expr("[:]", (obj_expr, expr, slice_end_expr)))
+                    else:
+                        parse_stk._push_expr(_Expr("[]", (obj_expr, expr)))
 
                 elif t.is_sym("."):
-                    todo
+                    t, name = self.token_list.pop_name()
+                    obj_expr = parse_stk._pop_expr()
+                    if self.token_list.peek().is_sym("("):
+                        #方法调用
+                        el = self._parse_expr_list(var_map_stk, ")")
+                        parse_stk._push_expr(_Expr("call_method", (obj_expr, name, el)))
+                    else:
+                        #属性访问
+                        parse_stk._push_expr(_Expr(".", (obj_expr, name)))
 
                 else:
                     self.token_list.revert()
@@ -316,4 +329,103 @@ class Parser:
         return parse_stk.finish()
 
     def _parse_mod_elem_expr(self, mod, name_token, name, var_map_stk):
-        todo
+        elem = mod.get_elem(name)
+        if elem is None:
+            name_token.syntax_err("找不到‘%s.%s’" % (mod, name))
+
+        if not (elem.is_public or self.mod is mod):
+            name_token.syntax_err("无法访问‘%s.%s’，没有权限" % (mod, name))
+
+        if elem.is_cls or elem.is_func:
+            #类和函数的使用都是直接调用
+            self.token_list.pop_sym("(")
+            el_start_token = self.token_list.peek()
+            el = self._parse_expr_list(var_map_stk, ")")
+
+            if elem.is_cls:
+                #调用的是类的构造函数，获取其参数表
+                construct_method = elem.get_construct_method()
+                if construct_method is None:
+                    construct_method_is_public = False
+                    arg_map = swc_util.OrderedDict()
+                else:
+                    construct_method_is_public = construct_method.is_public
+                    arg_map = construct_method.arg_map
+                if not (construct_method_is_public or self.mod is mod):
+                    name_token.syntax_err("无法创建‘%s.%s’的实例，对构造方法没有权限" % (mod, name))
+                op = "new_obj"
+            elif elem.is_func:
+                arg_map = elem.arg_map
+                op = "call_func"
+            else:
+                swc_util.abort()
+
+            if len(el) != len(arg_map):
+                el_start_token.syntax_err("参数数量错误，需要%d个" % len(arg_map))
+
+            return _Expr(op, (elem, el))
+
+        if elem.is_gv:
+            return _Expr("gv", elem)
+
+        swc_util.abort()
+
+    def _parse_expr_list(self, var_map_stk, end_sym):
+        el = []
+        while True:
+            if self.token_list.peek().is_sym(end_sym):
+                self.token_list.pop()
+                break
+            e = self.parse(var_map_stk)
+            el.append(e)
+            t, sym = self.token_list.pop_sym()
+            if sym == ",":
+                continue
+            if sym == end_sym:
+                break
+            t.syntax_err("需要‘,’或‘%s’" % end_sym)
+        return el
+
+    def _parse_str_format(self, var_map_stk, t):
+        assert t.is_literal("str")
+        self.token_list.pop_sym(".")
+        self.token_list.pop_sym("(")
+        el = self._parse_expr_list(var_map_stk, ")")
+        fmt = ""
+        pos = 0
+        ei = 0
+        while pos < len(t.value):
+            if t.value[pos] != "%":
+                fmt += t.value[pos]
+                pos += 1
+                continue
+            class FmtIdxErr(Exception):
+                pass
+            def fmt_chr():
+                if pos < len(t.value):
+                    return t.value[pos]
+                raise FmtIdxErr()
+            try:
+                pos += 1
+                if fmt_chr() == "%":
+                    fmt += "%%"
+                    pos += 1
+                    continue
+                if ei >= len(el):
+                    t.syntax_err("format格式化参数不足")
+                expr = el[ei]
+                #解析格式字符
+                verb = fmt_chr()
+                pos += 1
+                if verb in "tbcdoxXeEfFgGrsT":
+                    #合法格式
+                    el[ei] = _Expr("to_go_fmt_str", (verb, expr))
+                else:
+                    t.syntax_err("非法的格式符：'%s...'" % `t.value[: pos]`[1 : -1])
+                fmt += verb
+                ei += 1
+            except FmtIdxErr:
+                t.syntax_err("format格式串非正常结束")
+        if ei < len(el):
+            t.syntax_err("format格式化参数过多")
+        return fmt, el

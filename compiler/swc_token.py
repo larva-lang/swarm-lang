@@ -100,12 +100,12 @@ class _Token:
 
     def __setattr__(self, name, value):
         if self.__dict__.get("is_freezed", False):
-            raise Exception("Bug")
+            swc_util.abort()
         self.__dict__[name] = value
 
     def __delattr__(self, name):
         if self.__dict__.get("is_freezed", False):
-            raise Exception("Bug")
+            swc_util.abort()
         del self.__dict__[name]
 
     def syntax_err(self, msg = ""):

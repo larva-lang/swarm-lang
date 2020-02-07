@@ -1,6 +1,12 @@
 #coding=utf8
 
-import swc_util, swc_expr
+import swc_util, swc_expr, swc_mod
+
+class _Stmt:
+    def __init__(self, type, **kw_arg):
+        self.type = type
+        for k, v in kw_arg.iteritems():
+            setattr(self, k, v)
 
 class Parser:
     def __init__(self, token_list, mod, cls, fom):
@@ -9,7 +15,129 @@ class Parser:
         self.cls        = cls
         self.fom        = fom
 
-        self.expr_parser = swc_expr.Parser(token_list, mod, cls, fom)
+        self.expr_parser    = swc_expr.Parser(token_list, mod, cls, fom, self)
+        self.stmt_list      = []
 
     def parse(self, var_map_stk, loop_deep):
-        todo
+        while True:
+            if self.token_list.peek().is_sym("}"):
+                assert self.ccc_use_deep == top_ccc_use_deep
+                return self.stmt_list
+
+            t = self.token_list.pop()
+
+            if t.is_sym(";"):
+                t.warn("空语句")
+                continue
+
+            if t.is_sym("{"):
+                #新代码块
+                self.stmt_list.append(_Stmt("block", stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep)))
+                self.token_list.pop_sym("}")
+                continue
+
+            if t.is_reserved and t.value in ("break", "continue"):
+                if loop_deep == 0:
+                    t.syntax_err("循环外的%s" % t.value)
+                self.stmt_list.append(_Stmt(t.value))
+                self.token_list.pop_sym(";")
+                continue
+
+            if t.is_reserved("return"):
+                if self.token_list.peek().is_sym(";"):
+                    stmt = _Stmt("return_nil")
+                else:
+                    stmt = _Stmt("return", expr = self.expr_parser.parse(var_map_stk))
+                self.stmt_list.append(stmt)
+                self.token_list.pop_sym(";")
+                continue
+
+            if t.is_reserved("for"):
+                for_var_map, iter_expr = self._parse_for_prefix(var_map_stk)
+                self.token_list.pop_sym("{")
+                for_stmt_list = self.parse(var_map_stk + (for_var_map, swc_util.OrderedDict()), loop_deep + 1)
+                self.token_list.pop_sym("}")
+                self.stmt_list.append(_Stmt("for", for_var_map = for_var_map, iter_expr = iter_expr, stmt_list = for_stmt_list))
+                continue
+
+            if t.is_reserved("while"):
+                self.token_list.pop_sym("(")
+                expr = self.expr_parser.parse(var_map_stk)
+                self.token_list.pop_sym(")")
+                self.token_list.pop_sym("{")
+                stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep + 1)
+                self.token_list.pop_sym("}")
+                self.stmt_list.append(_Stmt("while", expr = expr, stmt_list = stmt_list))
+                continue
+
+            if t.is_reserved("if"):
+                if_expr_list = []
+                if_stmt_list_list = []
+                else_stmt_list = None
+                while True:
+                    self.token_list.pop_sym("(")
+                    expr = self.expr_parser.parse(var_map_stk)
+                    self.token_list.pop_sym(")")
+                    self.token_list.pop_sym("{")
+                    if_stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep)
+                    self.token_list.pop_sym("}")
+                    if_expr_list.append(expr)
+                    if_stmt_list_list.append(if_stmt_list)
+                    if not self.token_list.peek().is_reserved("else"):
+                        break
+                    self.token_list.pop()
+                    t = self.token_list.pop()
+                    if t.is_reserved("if"):
+                        continue
+                    if not t.is_sym("{"):
+                        t.syntax_err("需要'{'")
+                    else_stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep)
+                    self.token_list.pop_sym("}")
+                    break
+                self.stmt_list.append(_Stmt("if", if_expr_list = if_expr_list, if_stmt_list_list = if_stmt_list_list,
+                                            else_stmt_list = else_stmt_list))
+                continue
+
+            if t.is_reserved("var"):
+                var_def = swc_expr.parse_var_def(token_list)
+                new_vars = []
+                for t, name in var_def.iter_names():
+                    if name in var_map_stk[-1]:
+                        t.syntax_err("局部变量‘%s’重定义")
+                    for var_map in var_map_stk[: -1]:
+                        if name in var_map:
+                            t.syntax_err("局部变量‘%s’和上层局部变量名字冲突")
+                    swc_mod.check_lv_name_conflict(name, t, self.mod)
+                    var_map_stk[-1][name] = t
+                    new_vars.append(name)
+                self.stmt_list.append(_Stmt("var_def", vars = new_vars))
+                t = token_list.pop()
+                if t.is_sym(";"):
+                    #无初始化
+                    continue
+                if not t.is_sym("="):
+                    t.syntax_err("需要‘;’或‘=’")
+                init_expr = self.expr_parser.parse(var_map_stk)
+                token_list.pop_sym(";")
+                self.stmt_list.append(_Stmt("var_init", var_def = var_def, init_expr = init_expr))
+                continue
+
+            if t.is_reserved("defer"):
+                expr = self.expr_parser.parse(var_map_stk)
+                if expr.op not in ("call_method", "call_func"):
+                    t.syntax_err("defer表达式必须是一个函数或方法调用")
+                self.token_list.pop_sym(";")
+                self.stmt_list.append(_Stmt("defer", expr = expr))
+                continue
+
+            if t.is_native_code:
+                stmt_list.append(_Stmt("native_code", native_code = swc_mod.NativeCode(self.mod, t), fom = self.fom))
+                continue
+
+            if t.is_reserved("else"):
+                t.syntax_err("未匹配if的else")
+
+            todo
+
+    def def_func_obj(self, func_obj):
+        self.stmt_list.append(_Stmt("def_func_obj", func_obj = func_obj))
