@@ -164,12 +164,12 @@ def _is_expr_end(t):
     return False
 
 class Parser:
-    def __init__(self, token_list, mod, cls, fom, stmt_parser):
+    def __init__(self, token_list, mod, cls, fom, caller):
         self.token_list     = token_list
         self.mod            = mod
         self.cls            = cls
         self.fom            = fom
-        self.stmt_parser    = stmt_parser
+        self.caller         = caller    #使用parser的逻辑对象，有的流程中会回调其中的方法
 
     def parse(self, var_map_stk):
         start_token = self.token_list.peek()
@@ -268,7 +268,7 @@ class Parser:
             elif t.is_reserved("func"):
                 #函数对象
                 func_obj = swc_mod.parse_func_obj(t, self.token_list, self.mod, self.cls, var_map_stk)
-                self.stmt_parser.def_func_obj(func_obj)
+                self.caller.def_func_obj(func_obj)
                 parse_stk._push_expr(_Expr("func_obj", func_obj))
 
             else:

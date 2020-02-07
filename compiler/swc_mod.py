@@ -280,7 +280,7 @@ class _GvInit:
         self.expr               = None
 
     def _compile(self):
-        self.expr = swc_expr.Parser(self.expr_token_list, self.mod, None, None).parse(())
+        self.expr = swc_expr.Parser(self.expr_token_list, self.mod, None, None, self.mod).parse(())
         self.expr_token_list.pop_sym(";")
         assert not self.expr_token_list
         del self.expr_token_list
@@ -299,6 +299,7 @@ class Mod:
         self.func_map       = swc_util.OrderedDict()
         self.gv_map         = swc_util.OrderedDict()
         self.gv_init_list   = []
+        self.gfo_list       = []
 
         self._precompile()
         self._check_name_conflict()
@@ -481,6 +482,9 @@ class Mod:
                 elem._compile()
         for gi in self.gv_init_list:
             gi._compile()
+
+    def def_func_obj(self, func_obj):
+        self.gfo_list.append(func_obj)
 
 def check_lv_name_conflict(name, t, mod):
     if name in mod.dep_mod_set:
