@@ -212,7 +212,7 @@ def _output_native_code(code, nc, fom):
             self.line_idx   = nc.t.line_idx + 1 + line_idx + 1
 
     with code.new_native_code():
-        for line_idx, line in enumerate(native_code.line_list):
+        for line_idx, line in enumerate(nc.line_list):
             s = ""
             for i in line:
                 if isinstance(i, str):
@@ -277,7 +277,7 @@ def _output_method_default(code, cls_stru_name, cls_name, method_name, arg_count
 
             elif (simple_method_name, arg_count) == ("str", 0):
                 #默认的str调用repr
-                code += "return this.%s()" % _gen_method_name("__repr__", 0)
+                code += "return this.%s(perm)" % _gen_method_name("__repr__", 0)
 
             elif (simple_method_name, arg_count) == ("bool", 0):
                 #默认的bool为true
@@ -285,11 +285,11 @@ def _output_method_default(code, cls_stru_name, cls_name, method_name, arg_count
 
             elif simple_method_name in ("cmp", "eq", "add", "sub", "mul", "div", "mod", "shl", "shr", "and", "or", "xor") and arg_count == 1:
                 #默认的双目运算是调用反向操作
-                code += "return l_0.__r_%s__(this)" % simple_method_name
+                code += "return l_0.%s(perm, this)" % _gen_method_name("__r_%s__" % simple_method_name, 1)
 
             elif simple_method_name.startswith("i_") and arg_count == 1:
                 #默认的增量运算是调用普通双目运算
-                code += "return this.__%s__(l_0)" % simple_method_name[2 :]
+                code += "return this.%s(perm, l_0)" % _gen_method_name("__%s__" % simple_method_name[2 :], 1)
 
             else:
                 output_method_not_impl(code)
@@ -397,7 +397,7 @@ def _output_mod(mod):
                 if method.name == "__init__":
                     #对于构造方法还要生成对应的sw_new_obj_*函数
                     sw_new_obj_func_name = _gen_new_obj_func_name(cls, arg_count)
-                    with code.new_blk("func %s(%s) sw_obj" % (sw_new_obj_func_name, _gen_arg_def(method.arg_map))):
+                    with code.new_blk("func %s(%s) *%s" % (sw_new_obj_func_name, _gen_arg_def(method.arg_map), sw_cls_name)):
                         code += "o := new(%s)" % sw_cls_name
                         code.record_tb_info(_POS_INFO_IGNORE)
                         code += "o.%s(%s)" % (sw_method_name, ", ".join([str(mod.id)] + ["l_%s" % name for name in method.arg_map]))

@@ -13,7 +13,7 @@ public func abort(s)
 
 !<<
 
-func sw_util_sprintf(format string, args ...[]interface{}) string {
+func sw_util_sprintf(format string, args ...interface{}) string {
     return fmt.Sprintf(format, args...)
 }
 

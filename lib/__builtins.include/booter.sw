@@ -14,7 +14,7 @@ func sw_booter_check_go_panic() {
     }
 }
 
-func sw_booter_start_prog(init_std_lib_internal_mods func (), main_mod_init_func func (), main_func func ()) {
+func sw_booter_start_prog(init_std_lib_internal_mods func (), main_mod_init_func func (), main_func func () sw_obj) {
     exit_code := 0
     defer func () {
         if r := recover(); r != nil {
