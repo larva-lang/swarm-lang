@@ -13,7 +13,7 @@ public class bool
 func cast_to_bool(x)
 {
     var b = x.__bool__();
-    if (!isinstanceof(s, str))
+    if (!isinstanceof(b, bool))
     {
         throw(TypeError("‘__bool__’方法返回的对象不是bool对象"));
     }

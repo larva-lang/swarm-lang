@@ -242,7 +242,7 @@ class Parser:
                     else:
                         #当前模块或builtin模块的name
                         for m in self.mod, swc_mod.builtins_mod:
-                            ns = m.public_name_set() if m is swc_mod.builtins_mod else m.name_set()
+                            ns = m.name_set() if m is self.mod else m.public_name_set()
                             if name in ns:
                                 e = self._parse_mod_elem_expr(m, t, name, var_map_stk)
                                 parse_stk._push_expr(e)
