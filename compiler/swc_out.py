@@ -120,7 +120,7 @@ def _init_all_method_sign_set():
 
     #函数对象的call方法
     for fo_arg_count in swc_mod.func_obj_arg_count_set:
-        _all_method_sign_set.add(("call", len(func_obj.arg_map)))
+        _all_method_sign_set.add(("call", fo_arg_count))
 
 #gens-------------------------------------------------------------
 
@@ -166,7 +166,7 @@ def _gen_arg_def(arg_map, need_perm_arg = False):
     return ", ".join(al)
 
 def _gen_nil_literal():
-    return _gen_mod_elem_name(swc_mod.builtins_mod.gv_map["_nil_obj"])
+    return "sw_util_nil_obj"
 
 def _gen_bool_literal(b):
     return _gen_mod_elem_name(swc_mod.builtins_mod.gv_map["_bool_obj_%s" % ("true" if b else "false")])
@@ -241,6 +241,7 @@ def _output_func_obj_def(code, fo):
     with code.new_blk("var sw_fo_%d sw_obj = &%s" % (fo.id, _gen_func_obj_stru_name(arg_count))):
         with code.new_blk("f: func (%s) sw_obj" % (_gen_arg_def(fo.arg_map)), start_with_blank_line = False, tail = ","):
             _output_stmt_list(code, fo.stmt_list)
+            code += "return %s" % _gen_nil_literal()
 
 def _output_attr_method_default(code, cls_stru_name, cls_name, attr_name):
     exc_code = "sw_exc_make_no_attr_exc(`‘%s’没有属性‘%s’`)" % (cls_name, attr_name)
@@ -343,7 +344,7 @@ def _output_mod(mod):
                 for dep_mod_name in mod.dep_mod_set:
                     code += "%s()" % _gen_init_mod_func_name(swc_mod.mod_map[dep_mod_name])
                 for gv_init in mod.gv_init_list:
-                    _output_var_def_assign(gv_init.var_def, gv_init.expr, is_gv = True)
+                    _output_var_def_assign(code, gv_init.var_def, gv_init.expr, is_gv = True)
 
         #函数定义
         for func in mod.func_map.itervalues():
@@ -447,12 +448,12 @@ def _output_util():
             #对应的call方法
             arg_name_list = [str(i) for i in xrange(arg_count)]
             with code.new_blk("func (this *%s) %s(%s) sw_obj" %
-                              (fo_stru_name, _gen_method_name(("call", arg_count)), _gen_arg_def(arg_name_list, need_perm_arg = True))):
+                              (fo_stru_name, _gen_method_name("call", arg_count), _gen_arg_def(arg_name_list, need_perm_arg = True))):
                 code += "return this.f(%s)" % ", ".join(["l_%s" % arg_name for arg_name in arg_name_list])
             #内部使用的方法
             with code.new_blk("func (this *%s) type_name() string" % fo_stru_name):
                 code += "return %s" % _gen_str_literal(fo_name)
-            with code.new_blk("func (this *%s) addr() uint64" % sw_cls_name):
+            with code.new_blk("func (this *%s) addr() uint64" % fo_stru_name):
                 code += "return sw_util_obj_addr(this)"
             #补全属性的get和set
             for attr_name in swc_mod.all_attr_name_set:
