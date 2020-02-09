@@ -16,6 +16,11 @@ public class str
         !>>
     }
 
+    public func has(s)
+    {
+        //todo
+    }
+
     //todo
 }
 

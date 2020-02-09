@@ -316,7 +316,7 @@ class Parser:
             if i is not None:
                 #整数
                 try:
-                    if i[0] == "0":
+                    if i[0] == "0" and len(i) > 1:
                         if i[: 2] in ("0x", "0X"):
                             base = 16
                             prefix_len = 2

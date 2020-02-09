@@ -27,7 +27,7 @@ public func equals(a, b)
 !<<
 
 func sw_obj_lt(a, b sw_obj) bool {
-    return sw_func_@<<:less_than>>_2(a, b).(*sw_cls_@<<:int>>).v
+    return sw_func_@<<:less_than>>_2(a, b).(*sw_cls_@<<:bool>>).v
 }
 
 func sw_obj_eq(a, b sw_obj) bool {
