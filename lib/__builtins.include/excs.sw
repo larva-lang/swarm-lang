@@ -76,7 +76,7 @@ public func throw_index_error(idx, sz)
     {
         throw(TypeError("throw_index_error(idx, sz)的参数需要是两个int"));
     }
-    exc = IndexError();
+    var exc = IndexError();
     exc.idx = idx;
     exc.sz  = sz;
     return exc;

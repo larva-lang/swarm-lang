@@ -20,7 +20,7 @@ public class range
 
     public func next()
     {
-        ret = this.curr;
+        var ret = this.curr;
         this.curr += 1;
         return ret;
     }
