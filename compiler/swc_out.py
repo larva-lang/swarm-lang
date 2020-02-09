@@ -327,7 +327,7 @@ def _gen_expr_code(expr):
     if expr.op in ("~", "neg", "pos"):
         imn = "inv" if expr.op == "~" else expr.op
         e = expr.arg
-        return "(%s).%s(%d)" % (_gen_expr_code(e), _gen_method_name("__%s__" % imn), mod.id)
+        return "(%s).%s(%d)" % (_gen_expr_code(e), _gen_method_name("__%s__" % imn, 0), mod.id)
 
     if expr.op == "is": #is是特殊的双目运算
         ea, eb = expr.arg
@@ -348,7 +348,7 @@ def _gen_expr_code(expr):
     if expr.op in _BINOCULAR_OP_2_INTERNAL_METHOD:
         imn = _BINOCULAR_OP_2_INTERNAL_METHOD[expr.op]
         ea, eb = expr.arg
-        return "(%s).%s(%d, %s)" % (_gen_expr_code(ea), _gen_method_name("__%s__" % imn), mod.id, _gen_expr_code(eb))
+        return "(%s).%s(%d, %s)" % (_gen_expr_code(ea), _gen_method_name("__%s__" % imn, 1), mod.id, _gen_expr_code(eb))
 
     if expr.op == "if-else":
         e_cond, ea, eb = expr.arg
@@ -439,8 +439,9 @@ def _output_simple_assign(code, lvalue, expr):
         sub_lvalue_count = len(sub_lvalues)
         assert sub_lvalue_count > 0
         tmp_var_name = _gen_tmp_var_name()
-        code += ("var %s []sw_obj = %s((%s), %d).v" %
-                    (tmp_var_name, _gen_mod_elem_name(_get_builtins_func("_unpack_multi_value", 2)), expr_code, sub_lvalue_count))
+        code += ("var %s []sw_obj = %s((%s), sw_int_from_go_int(%d)).(*%s).v" %
+                 (tmp_var_name, _gen_mod_elem_name(_get_builtins_func("_unpack_multi_value", 2)), expr_code, sub_lvalue_count,
+                  _gen_mod_elem_name(_get_builtins_cls("list"))))
         for i, sub_lvalue in enumerate(sub_lvalues):
             assert sub_lvalue.is_lvalue
             output_simple_assign_ex(code, sub_lvalue, "%s[%d]" % (tmp_var_name, i))
@@ -559,7 +560,7 @@ def _output_mod():
                 for dep_mod_name in mod.dep_mod_set:
                     code += "%s()" % _gen_init_mod_func_name(swc_mod.mod_map[dep_mod_name])
                 for gv_init in mod.gv_init_list:
-                    _output_simple_assign(code, gv_init.var_def.to_lvalue(mod), gv_init_list.expr)
+                    _output_simple_assign(code, gv_init.var_def.to_lvalue(mod), gv_init.expr)
 
         #函数定义
         for func in mod.func_map.itervalues():

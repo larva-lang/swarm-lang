@@ -35,15 +35,15 @@ public func handle_exc(handler)
 
 public func call_and_catch(f)
 {
-    var exc, tb;
+    var (exc, tb);
     func () {
         defer handle_exc(func (_exc, _tb) {
             exc = _exc;
             tb  = _tb;
-        })
+        });
 
         f.call();
-    }();
+    }.call();
     return (exc, tb);
 }
 

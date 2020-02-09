@@ -32,30 +32,30 @@ func sw_util_to_go_fmt_str(format string, x sw_obj) string {
     }
 
     switch o := x.(type) {
-    case sw_cls_@<<:bool>>:
+    case *sw_cls_@<<:bool>>:
         if format == "%t" {
             return fmt.Sprintf(format, o.v)
         }
-    case sw_cls_@<<:int>>:
+    case *sw_cls_@<<:int>>:
         switch format {
         case "%b", "%c", "%d", "%o", "%x", "%X":
             if format != "%c" || (o.v >= 0 && o.v <= 0xFF) {
                 return fmt.Sprintf(format, o.v)
             }
         }
-    case sw_cls_@<<:uint>>:
+    case *sw_cls_@<<:uint>>:
         switch format {
         case "%b", "%c", "%d", "%o", "%x", "%X":
             if format != "%c" || (o.v >= 0 && o.v <= 0xFF) {
                 return fmt.Sprintf(format, o.v)
             }
         }
-    case sw_cls_@<<:float>>:
+    case *sw_cls_@<<:float>>:
         switch format {
         case "%b", "%x", "%X", "%e", "%E", "%f", "%F", "%g", "%G":
             return fmt.Sprintf(format, o.v)
         }
-    case sw_cls_@<<:str>>:
+    case *sw_cls_@<<:str>>:
         switch format {
         case "%x", "%X":
             return fmt.Sprintf(format, o.v)
