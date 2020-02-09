@@ -31,6 +31,8 @@ def main():
     main_mod_name = os.path.basename(main_mod_file)[: -3]
     if not swc_token.is_valid_name(main_mod_name):
         swc_util.exit("主模块名‘%s’不是一个合法标识符" % main_mod_name)
+    if main_mod_name.startswith("__"):
+        swc_util.exit("主模块名‘%s’不能是内部模块名" % main_mod_name)
 
     #模块查找路径
     swc_mod.mod_path = [os.path.dirname(main_mod_file), sw_dir + "/lib"]
@@ -41,7 +43,7 @@ def main():
     swc_mod.precompile(main_mod_name)
     swc_mod.compile()
 
-    #todo
+    swc_out.output()
 
 if __name__ == "__main__":
     main()

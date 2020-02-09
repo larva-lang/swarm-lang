@@ -130,6 +130,10 @@ class _TokenList:
         for i in xrange(self.i, len(self.l)):
             yield self.l[i]
 
+    def extend(self, other):
+        assert self.i == 0 and other.i == 0
+        self.l += other.l
+
     def peek(self, start_idx = 0):
         try:
             return self.l[self.i + start_idx]
@@ -209,9 +213,6 @@ class Parser:
         self.line_idx = None
         self.line = None
         self.pos = None
-
-    def _syntax_err(self, msg):
-        _syntax_err(self, msg)
 
     def _get_escape_char(self, s):
         if s[0] in "abfnrtv":
@@ -435,6 +436,8 @@ class Parser:
                     native_code = None
                 else:
                     native_code.line_list.append(self.line)
+                    if self.line.rstrip().endswith(";"):
+                        _syntax_warn(self, "Native代码行以分号结尾")
                 continue
             else:
                 if self.line.strip() == "!<<":

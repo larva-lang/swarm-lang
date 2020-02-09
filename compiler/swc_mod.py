@@ -1,6 +1,6 @@
 #coding=utf8
 
-import os
+import os, random
 
 import swc_util, swc_token, swc_expr, swc_stmt
 
@@ -290,7 +290,7 @@ class Mod:
         self.id = swc_util.new_id()
 
         self.name = mn
-        self.src_fn = self._find_mod_file()
+        self.src_fns = self._find_mod_files()
 
         self.literal_list   = None
         self.dep_mod_set    = set()
@@ -306,15 +306,26 @@ class Mod:
 
     __repr__ = __str__ = lambda self : self.name
 
-    def _find_mod_file(self):
+    def _find_mod_files(self):
         for d in mod_path:
             mod_fn = "%s/%s.sw" % (d, self.name)
             if os.path.isfile(mod_fn):
-                return mod_fn
+                fns = [mod_fn]
+                incl_dn = "%s/%s.include" % (d, self.name)
+                if os.path.isdir(incl_dn):
+                    incl_fns = ["%s/%s" % (incl_dn, fn) for fn in os.listdir(incl_dn) if fn.endswith(".sw")]
+                    random.shuffle(incl_fns)
+                    fns += incl_fns
+                return fns
+
         swc_util.exit("找不到模块‘%s’" % self.name)
 
     def _precompile(self):
-        token_list = swc_token.Parser(self.src_fn).parse()
+        assert self.src_fns
+        token_list = swc_token.Parser(self.src_fns[0]).parse()
+        for fn in self.src_fns[1 :]:
+            tl = swc_token.Parser(fn).parse()
+            token_list.extend(tl)
         self._parse_text(token_list)
 
     def _parse_text(self, token_list):
@@ -373,8 +384,8 @@ class Mod:
         t, name = token_list.pop_name()
         if name in self.dep_mod_set:
             t.syntax_err("模块重复导入")
-        if name == "__builtins":
-            t.syntax_err("不能显式导入‘__builtins’")
+        if not self.name.startswith("__") and name.startswith("__"):
+            t.syntax_err("普通模块不能显式导入内部模块‘%s’" % name)
         self.dep_mod_set.add(name)
         token_list.pop_sym(";")
 
@@ -468,6 +479,7 @@ class Mod:
                 check_lv_name_conflict(name, t, self)
 
     def _check_main_func(self):
+        assert self is main_mod
         if "main" not in self.func_map:
             swc_util.exit("主模块‘%s’没有main函数" % self)
         main_func = self.func_map["main"]
@@ -475,6 +487,10 @@ class Mod:
             swc_util.exit("主模块‘%s’的main函数必须是public的" % self)
         if len(main_func.arg_map) != 0:
             swc_util.exit("主模块‘%s’的main函数不能有参数" % self)
+
+    def get_main_func(self):
+        assert self is main_mod and "main" in self.func_map
+        return self.func_map["main"]
 
     def _compile(self):
         for m in self.cls_map, self.func_map:

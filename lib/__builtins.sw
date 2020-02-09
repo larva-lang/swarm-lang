@@ -1,17 +1,12 @@
-public func println(a)
-{
-    //todo
-}
+!<<
 
-public class range
-{
-    public func __init__(begin, end)
-    {
-        //todo
-    }
-}
+import (
+    "fmt"
+    "reflect"
+    "runtime"
+    "path/filepath"
+    "strings"
+    "os"
+)
 
-public func map(it, f)
-{
-    //todo
-}
+!>>
