@@ -164,7 +164,7 @@ def _output_booter():
                       _gen_func_name(swc_mod.main_mod.get_main_func())))
 
 def _output_mod(mod):
-    todo
+    "todo"
 
 def _output_util():
     with _Code("%s/%s.util.go" % (_out_prog_dir, _prog_pkg_name)) as code:
@@ -178,6 +178,11 @@ def _output_util():
                     code += ("sw_util_go_tb{file: %s, line: %d}: &sw_util_sw_tb{file: %s, line: %d, fom_name: %s}," %
                              (_gen_str_literal(go_file_name), go_line_no, _gen_str_literal(sw_file_name), sw_line_no,
                               _gen_str_literal(sw_fom_name)))
+
+        #sw_obj的定义
+        with code.new_blk("type sw_obj interface"):
+            for name, arg_count in _all_method_sign_set:
+                code += "%s(%s) sw_obj" % (name, ", ".join(["sw_obj"] * arg_count))
 
 def _make_prog():
     if platform.system() in ("Darwin", "Linux"):
