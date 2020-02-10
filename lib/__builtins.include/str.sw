@@ -117,7 +117,7 @@ public class str
         {
             !<<
             v := l_other.(*sw_cls_@<<:str>>).v
-            bool result;
+            bool result
             switch l_op.(*sw_cls_@<<:str>>).v {
             case "<":
                 result = this.v < v

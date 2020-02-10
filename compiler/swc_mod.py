@@ -171,6 +171,7 @@ class _ModElem:
 class _Attr:
     def __init__(self, cls, decr_set, name_token, name):
         self.cls        = cls
+        self.decr_set   = decr_set
         self.is_public  = "public" in decr_set
         self.name_token = name_token
         self.name       = name
@@ -182,6 +183,7 @@ class _Attr:
 class _Method:
     def __init__(self, cls, decr_set, name_token, name, arg_map, block_token_list):
         self.cls        = cls
+        self.decr_set   = decr_set
         self.is_public  = "public" in decr_set
         self.name_token = name_token
         self.name       = name
@@ -330,8 +332,9 @@ class _Cls(_ModElem):
             self.attr_map[ext_attr.name] = _Attr(self, ext_attr.decr_set, ext_attr.name_token, ext_attr.name)
         for ext_method in ext_method_map.itervalues():
             assert ext_method.name not in self.method_map
-            self.method_map[ext_method.name] = _Method(self, ext_method.decr_set, ext_method.name_token, ext_method.name,
-                                                       ext_method.arg_map.copy(), ext_method.block_token_list.copy())
+            self.method_map[(ext_method.name, len(ext_method.arg_map))] = (
+                _Method(self, ext_method.decr_set, ext_method.name_token, ext_method.name, ext_method.arg_map.copy(),
+                        ext_method.block_token_list.copy()))
 
         self.ext_cls_name_list = None
         self.ext_cls_expand_stat = "expanded"
@@ -500,10 +503,10 @@ class Mod:
     def _parse_cls(self, decr_set, token_list):
         t, name = token_list.pop_name()
         self._check_redefine(t, name)
+        ext_cls_name_list = []
         if token_list.peek().is_sym("("):
             #扩展了其他类
             token_list.pop_sym("(")
-            ext_cls_name_list = []
             while True:
                 t, ext_cls_name = token_list.pop_name()
                 ext_cls_name_list.append((t, ext_cls_name))

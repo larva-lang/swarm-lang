@@ -57,9 +57,9 @@ public class float
             var result bool
             switch l_op.(*sw_cls_@<<:str>>).v {
             case "<":
-                result = this.v < v;
+                result = this.v < v
             case "==":
-                result = this.v == v;
+                result = this.v == v
             default:
                 panic("bug")
             }
