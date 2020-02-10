@@ -143,6 +143,24 @@ def _init_all_method_sign_set():
     for func_obj in swc_mod.func_objs:
         _all_method_sign_set.add(("call", len(func_obj.arg_map)))
 
+def _gen_init_mod_func_name(mod):
+    return "sw_env_init_mod_" + mod.name
+
+def _gen_func_name(func):
+    assert func.is_func
+    return "sw_func_%d_%s_%d_%s" % (len(func.mod.name), func.mod.name, len(func.name), func.name)
+
+def _gen_str_literal(s):
+    code_list = []
+    for c in s:
+        asc = ord(c)
+        assert 0 <= asc <= 0xFF
+        if asc < 32 or asc > 126 or c in ('"', "\\"):
+            code_list.append("\\%03o" % asc)
+        else:
+            code_list.append(c)
+    return '"%s"' % "".join(code_list)
+
 _BOOTER_START_PROG_FUNC_NAME = "Sw_booter_start_prog"
 
 def _output_main_pkg():
