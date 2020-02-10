@@ -113,7 +113,7 @@ class Parser:
 
             if t.is_reserved("defer"):
                 expr = self.expr_parser.parse(var_map_stk)
-                if expr.op not in ("call_method", "call_func"):
+                if expr.op not in ("call_this.method", "call_method", "call_func"):
                     t.syntax_err("defer表达式必须是一个函数或方法调用")
                 self.token_list.pop_sym(";")
                 self.stmt_list.append(_Stmt("defer", expr = expr))

@@ -69,7 +69,7 @@ class _Expr:
         self.op     = op
         self.arg    = arg
 
-        self.is_lvalue = op in ("gv", "lv", "[]", ".") or (op == "tuple" and all([elem.is_lvalue for elem in arg]))
+        self.is_lvalue = op in ("gv", "lv", "[]", "[:]", "this.attr", ".") or (op == "tuple" and all([elem.is_lvalue for elem in arg]))
 
         self.pos_info = None #位置信息，只有在解析栈finish时候才会被赋值为解析栈的开始位置，参考相关代码，主要用于output时候的代码位置映射构建
 
@@ -99,7 +99,7 @@ class _ParseStk:
                 if op in ("if", "else"):
                     assert self.op_stk[-1] in ("if", "if-else")
                     if self.op_stk[-1] == "if" and op == "else":
-                        #匹配了三元运算符，在外面统一处理合并
+                        #匹配了三目运算符，在外面统一处理合并
                         break
                     self.start_token.syntax_err("禁止多个'if-else'表达式直接混合运算，请加括号")
                 self._pop_top_op()
@@ -131,7 +131,7 @@ class _ParseStk:
             self.start_token.syntax_err("非法的表达式，存在未匹配'else'的'if'")
 
         elif op == "if-else":
-            #三元运算符
+            #三目运算符
             if len(self.stk) < 3:
                 self.start_token.syntax_err("非法的表达式")
             eb = self._pop_expr()
@@ -271,6 +271,28 @@ class Parser:
                 self.caller.def_func_obj(func_obj)
                 parse_stk._push_expr(_Expr("func_obj", func_obj))
 
+            elif t.is_reserved("isinstanceof"):
+                self.token_list.pop_sym("(")
+                e = self.parse(var_map_stk)
+                self.token_list.pop_sym(",")
+                t, name = self.token_list.pop_name()
+                if name in self.mod.dep_mod_set:
+                    m = swc_mod.mod_map[name]
+                    self.token_list.pop_sym(".")
+                    _, name = self.token_list.pop_name()
+                    cls = m.cls_map.get(name)
+                    if cls is None:
+                        t.syntax_err("无效的类‘%s.%s’" % (m, name))
+                else:
+                    for m in self.mod, swc_mod.builtins_mod:
+                        cls = m.cls_map.get(name)
+                        if cls is not None:
+                            break
+                    else:
+                        t.syntax_err("无效的类‘%s’" % name)
+                self.token_list.pop_sym(")")
+                parse_stk._push_expr(_Expr("isinstanceof", (e, cls)))
+
             else:
                 t.syntax_err("非法的表达式")
 
@@ -308,10 +330,25 @@ class Parser:
                         #方法调用
                         self.token_list.pop_sym("(")
                         el = self._parse_expr_list(var_map_stk, ")")
-                        parse_stk._push_expr(_Expr("call_method", (obj_expr, name, el)))
+                        if obj_expr.op == "this":
+                            method = self.cls.method_map.get((name, len(el)))
+                            if method is None:
+                                t.syntax_err("类‘%s’没有参数个数为%d的方法‘%s’" % (self.cls, len(el), name))
+                            parse_stk._push_expr(_Expr("call_this.method", (name, el)))
+                        else:
+                            if name != "call" and (name, len(el)) not in swc_mod.all_method_sign_set:
+                                #尽量检测一下，做不到完全
+                                t.syntax_err("程序中没有名为‘%s’且参数数量为%d个的方法" % (name, len(el)))
+                            parse_stk._push_expr(_Expr("call_method", (obj_expr, name, el)))
                     else:
                         #属性访问
-                        parse_stk._push_expr(_Expr(".", (obj_expr, name)))
+                        if obj_expr.op == "this":
+                            attr = self.cls.attr_map.get(name)
+                            if attr is None:
+                                t.syntax_err("类‘%s’没有属性‘%s’" % (self.cls, name))
+                            parse_stk._push_expr(_Expr("this.attr", name))
+                        else:
+                            parse_stk._push_expr(_Expr(".", (obj_expr, name)))
 
                 else:
                     self.token_list.revert()
@@ -321,13 +358,13 @@ class Parser:
                 #表达式结束
                 break
 
-            #状态：解析普通二元运算符
+            #状态：解析普通双、三目运算符
             t = self.token_list.pop()
             if (t.is_sym and t.value in _BINOCULAR_OP_SET) or (t.is_reserved and t.value in ("if", "else", "is")):
-                #二、三元运算
+                #双、三目运算
                 parse_stk._push_op(t.value)
             else:
-                t.syntax_err("需要二元或三元运算符")
+                t.syntax_err("需要双目或三目运算符")
 
         return parse_stk.finish()
 
@@ -347,8 +384,11 @@ class Parser:
 
             if elem.is_cls:
                 #调用的是类的构造函数，获取其参数表
-                construct_method = elem.get_construct_method()
+                construct_method = elem.get_construct_method(len(el))
                 if construct_method is None:
+                    if el:
+                        name_token.syntax_err("无法创建‘%s.%s’的实例，没有参数数量为%d的构造方法" % (mod, name, len(el)))
+                    #使用默认构造方法
                     construct_method_is_public = False
                     arg_map = swc_util.OrderedDict()
                 else:

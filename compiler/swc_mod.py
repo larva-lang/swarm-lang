@@ -10,6 +10,8 @@ builtins_mod = None
 main_mod = None
 mod_map = swc_util.OrderedDict()
 
+all_method_sign_set = swc_util.OrderedSet()  #用于存储所有定义的方法的签名，元素为(方法名, 参数数量)
+
 def _parse_decr_set(token_list):
     decr_set = set()
     while True:
@@ -153,6 +155,8 @@ class _Method:
         self.block_token_list   = block_token_list
         self.stmt_list          = None
 
+        all_method_sign_set.add((self.name, len(self.arg_map)))
+
     __repr__ = __str__ = lambda self : "%s.%s" % (self.cls, self.name)
 
     def _compile(self):
@@ -170,9 +174,10 @@ class _Cls(_ModElem):
         self.name_token = name_token
         self.name       = name
 
-        self.nc_list    = []
-        self.attr_map   = swc_util.OrderedDict()
-        self.method_map = swc_util.OrderedDict()
+        self.nc_list            = []
+        self.attr_map           = swc_util.OrderedDict()
+        self.method_map         = swc_util.OrderedDict()
+        self.method_name_set    = swc_util.OrderedSet()
 
     __repr__ = __str__ = lambda self : "%s.%s" % (self.mod, self.name)
 
@@ -198,6 +203,8 @@ class _Cls(_ModElem):
                 #属性定义
                 while True:
                     t, name = token_list.pop_name()
+                    if name.startswith("__") and name.endswith("__"):
+                        t.syntax_err("属性不能使用内建方法名的样式")
                     self._check_redefine(t, name)
                     self.attr_map[name] = _Attr(self, decr_set, t, name)
                     t, sym = token_list.pop_sym()
@@ -213,30 +220,41 @@ class _Cls(_ModElem):
             if t.is_reserved("func"):
                 #方法定义
                 t, name = token_list.pop_name()
-                self._check_redefine(t, name)
                 token_list.pop_sym("(")
                 arg_map = _parse_arg_map(token_list)
                 token_list.pop_sym(")")
+                arg_count = len(arg_map)
+                self._check_redefine(t, name, arg_count)
                 token_list.pop_sym("{")
                 block_token_list, sym = swc_token.parse_token_list_until_sym(token_list, ("}",))
                 assert sym == "}"
-                self.method_map[name] = _Method(self, decr_set, t, name, arg_map, block_token_list)
+                self.method_map[(name, arg_count)] = _Method(self, decr_set, t, name, arg_map, block_token_list)
+                self.method_name_set.add(name)
                 continue
 
             t.syntax_err("需要属性或方法定义")
 
-    def _check_redefine(self, t, name):
-        for i in self.attr_map, self.method_map:
-            if name in i:
-                t.syntax_err("属性或方法名重定义")
+    def _check_redefine(self, t, name, method_arg_count = None):
+        if method_arg_count is None:
+            #属性定义
+            if name in self.attr_map:
+                t.syntax_err("属性名‘%s’重定义" % name)
+            if name in self.method_name_set:
+                t.syntax_err("属性名‘%s’和已定义的方法名冲突" % name)
+        else:
+            #方法定义
+            if name in self.attr_map:
+                t.syntax_err("方法名‘%s’和已定义的属性名冲突" % name)
+            if (name, method_arg_count) in self.method_map:
+                t.syntax_err("已存在名为‘%s’的有%d个参数的方法" % (name, method_arg_count))
 
     def _compile(self):
         for method in self.method_map.itervalues():
             method._compile()
 
-    def get_construct_method(self):
+    def get_construct_method(self, arg_count):
         construct_method_name = "__init__"
-        return self.method_map[construct_method_name] if construct_method_name in self.method_map else None
+        return self.method_map.get((construct_method_name, arg_count))
 
 class _Func(_ModElem):
     def __init__(self, mod, decr_set, name_token, name, arg_map, block_token_list):
@@ -522,7 +540,8 @@ class _FuncObj:
         self.arg_map    = arg_map
         self.stmt_list  = None
 
-    __repr__ = __str__ = lambda self: "func_obj[%s:%s:%s]" % (self.mod, self.func_token.line_idx + 1, self.func_token.pos + 1)
+    __repr__ = __str__ = lambda self: "func_obj[%s:%s:%s:%s]" % (self.mod, os.path.base_name(self.func_token.src_fn),
+                                                                 self.func_token.line_idx + 1, self.func_token.pos + 1)
 
 func_objs = []
 

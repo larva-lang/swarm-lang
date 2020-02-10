@@ -30,6 +30,9 @@ class OrderedDict:
     def __iter__(self):
         return iter(self.l)
 
+    def __contains__(self, x):
+        return x in self.d
+
     def __len__(self):
         return len(self.l)
 
@@ -43,6 +46,9 @@ class OrderedDict:
         if k not in self.d:
             self.l.append(k)
         self.d[k] = v
+
+    def get(self, k, default = None):
+        return self.d.get(k, default)
 
     def itervalues(self):
         for k in self.l:
@@ -68,6 +74,9 @@ class OrderedSet:
     def __init__(self):
         self.d = OrderedDict()
 
+    def __contains__(self, x):
+        return x in self.d
+
     def __iter__(self):
         return iter(self.d)
 
@@ -80,11 +89,8 @@ class OrderedSet:
     def add(self, k):
         self.d[k] = None
 
-    def key_at(self, idx):
+    def elem_at(self, idx):
         return self.d.key_at(idx)
-
-    def value_at(self, idx):
-        return self.d.value_at(idx)
 
     def copy(self):
         os = OrderedSet()

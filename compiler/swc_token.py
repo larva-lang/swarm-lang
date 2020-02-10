@@ -30,7 +30,7 @@ BINOCULAR_OP_SYM_SET = set(["%", "^", "&", "*", "-", "+", "|", "<", ">", "/", "!
 _SYM_SET = set("""~!(){}[]:;'",.""") | BINOCULAR_OP_SYM_SET | ASSIGN_SYM_SET
 
 _RESERVED_WORD_SET = set(["import", "class", "func", "for", "while", "if", "else", "return", "nil", "true", "false", "break", "continue",
-                          "this", "public", "var", "defer", "final", "is"])
+                          "this", "public", "var", "defer", "final", "is", "isinstanceof"])
 
 class _Token:
     def __init__(self, type, value, src_fn, line_idx, pos):
