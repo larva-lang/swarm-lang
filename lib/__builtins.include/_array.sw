@@ -20,7 +20,7 @@ class _Array
 
     public func __repr__()
     {
-        var start, end;
+        var (start, end);
         if (isinstanceof(this, tuple))
         {
             start   = "(";
