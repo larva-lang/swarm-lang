@@ -9,7 +9,7 @@ public class bool
     //todo
 }
 
-final var (bool_obj_true, bool_obj_false);
+final var (_bool_obj_true, _bool_obj_false);
 
 !<<
 
@@ -18,8 +18,8 @@ final var (bool_obj_true, bool_obj_false);
 在这个init之前执行的只有Go层面的全局变量初值赋值，都统一赋值为sw_obj_get_nil()，不会依赖true和false
 */
 func init() {
-    sw_gv_@<<:bool_obj_true>>   = &sw_cls_@<<:bool>>{v: true}
-    sw_gv_@<<:bool_obj_false>>  = &sw_cls_@<<:bool>>{v: false}
+    sw_gv_@<<:_bool_obj_true>>  = &sw_cls_@<<:bool>>{v: true}
+    sw_gv_@<<:_bool_obj_false>> = &sw_cls_@<<:bool>>{v: false}
 }
 
 !>>

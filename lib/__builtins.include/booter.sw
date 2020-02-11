@@ -47,7 +47,7 @@ func sw_booter_start_fiber(f sw_obj) {
         }
     }()
 
-    f.sw_method_call_0()
+    f.sw_method_call_0(-1)
 }
 
 !>>

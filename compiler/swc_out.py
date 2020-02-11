@@ -10,6 +10,8 @@ _out_prog_dir = _prog_pkg_name = _exe_file = _main_pkg_file = _all_method_sign_s
 
 _POS_INFO_IGNORE = object()
 
+_SUPER_PERM = "-19840427"   #特殊情况下需要操作属性或方法的超级权限，即无视是否public，这个功能留着暂不开启
+
 _tb_map = {}
 
 class _Code:
@@ -118,7 +120,9 @@ def _init_all_method_sign_set():
     add_internal_method_sign("repr", 0)
     add_internal_method_sign("str", 0)
     #比较方法
-    add_internal_method_sign("cmp", 1)
+    for name in "cmp", "eq":
+        for prefix in "", "r_":
+            add_internal_method_sign(prefix + name, 1)
     #布尔值
     add_internal_method_sign("bool", 0)
     #包含元素相关
@@ -129,7 +133,7 @@ def _init_all_method_sign_set():
     add_internal_method_sign("setslice", 3)
     #双目数值运算
     for name in "add", "sub", "mul", "div", "mod", "shl", "shr", "and", "or", "xor":
-        for prefix in "", "i", "r":
+        for prefix in "", "i_", "r_":
             add_internal_method_sign(prefix + name, 1)
     #单目数值运算
     for name in "inv", "pos", "neg":
@@ -180,14 +184,20 @@ def _gen_set_attr_method_name(name):
 def _gen_literal_name(t):
     return "sw_literal_%d" % t.id
 
-def _gen_arg_def(arg_map):
-    return ", ".join(["l_%s sw_obj" % name for name in arg_map])
+def _gen_arg_def(arg_map, need_perm_arg = False):
+    al = ["l_%s sw_obj" % name for name in arg_map]
+    if need_perm_arg:
+        al = ["perm int64"] + al
+    return ", ".join(al)
 
 def _gen_nil_literal():
-    return _gen_mod_elem_name(swc_mod.builtins_mod.gv_map["nil_obj"])
+    return _gen_mod_elem_name(swc_mod.builtins_mod.gv_map["_nil_obj"])
 
 def _gen_bool_literal(b):
-    return _gen_mod_elem_name(swc_mod.builtins_mod.gv_map["bool_obj_%s" % bool(b)])
+    return _gen_mod_elem_name(swc_mod.builtins_mod.gv_map["_bool_obj_%s" % bool(b)])
+
+def _gen_new_obj_func_name(cls, arg_count):
+    return "sw_new_obj_%s_%d" % (_gen_mod_elem_name(cls), arg_count)
 
 #gens end-------------------------------------------------------------
 
@@ -281,7 +291,45 @@ def _output_mod(mod):
                 code += "return %s" % _gen_nil_literal()
 
         #类的定义
-        todo
+        for cls in mod.cls_map.itervalues():
+            sw_cls_name = _gen_mod_elem_name(cls)
+
+            with code.new_blk("type %s struct" % sw_cls_name):
+                for nc in cls.ncl:
+                    _output_native_code(code, nc, "")
+                for attr in cls.attr_map.itervalues():
+                    code += "m_%s sw_obj" % attr.name
+
+            #内部使用的方法
+            with code.new_blk("func (this *%s) type_name() string" % sw_cls_name):
+                code += "return %s" % _gen_str_literal(str(cls))
+
+            #用户定义方法
+            usr_def_method_sign_set = set()
+            for method in cls.method_map.itervalues():
+                arg_count = len(method.arg_map)
+                assert (method.name, arg_count) not in usr_def_method_sign_set
+                usr_def_method_sign_set.add((method.name, arg_count))
+                sw_method_name = _gen_method_name((method.name, arg_count))
+                with code.new_blk("func (this *%s) %s(%s) sw_obj" %
+                                  (sw_cls_name, sw_method_name, _gen_arg_def(method.arg_map, need_perm_arg = True))):
+                    if not method.is_public:
+                        with code.new_blk("if perm != %d" % mod.id):
+                            code += "%s(%s)" % (_gen_mod_elem_name(mod.builtins_mod.func_map[("throw", 1)]),
+                                                _gen_mod_elem_name(mod.builtins_mod.gv_map["_exc_no_perm"]))
+                    _output_stmt_list(code, method.stmt_list)
+                    code += "return %s" % _gen_nil_literal()
+                if method.name == "__init__":
+                    #对于构造方法还要生成对应的sw_new_obj_*函数
+                    sw_new_obj_func_name = _gen_new_obj_func_name(cls, arg_count)
+                    with code.new_blk("func %s(%s) sw_obj" % (sw_new_obj_func_name, _gen_arg_def(method.arg_map))):
+                        code += "o := new(%s)" % sw_cls_name
+                        code.record_tb_info(_POS_INFO_IGNORE)
+                        code += "o.%s(%s)" % (sw_method_name, ", ".join([str(mod.id)] + ["l_%s" % name for name in method.arg_map]))
+                        code += "return o"
+
+            #补全其他方法
+            todo
 
 def _output_util():
     with _Code("%s/%s.util.go" % (_out_prog_dir, _prog_pkg_name)) as code:
@@ -299,12 +347,11 @@ def _output_util():
         #sw_obj的定义
         with code.new_blk("type sw_obj interface"):
             code += "type_name() string"
-            code += "check_permission(int64) sw_obj"
             for name in swc_mod.all_attr_name_set:
-                code += "%s() sw_obj" % (_gen_get_attr_method_name(name))
-                code += "%s(sw_obj)" % (_gen_set_attr_method_name(name))
+                code += "%s(int64) sw_obj" % (_gen_get_attr_method_name(name))
+                code += "%s(int64, sw_obj)" % (_gen_set_attr_method_name(name))
             for name, arg_count in _all_method_sign_set:
-                code += "%s(%s) sw_obj" % (_gen_method_name(name, arg_count), ", ".join(["sw_obj"] * arg_count))
+                code += "%s(int64, %s) sw_obj" % (_gen_method_name(name, arg_count), ", ".join(["sw_obj"] * arg_count))
 
 def _make_prog():
     if platform.system() in ("Darwin", "Linux"):

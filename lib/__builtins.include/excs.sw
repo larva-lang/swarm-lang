@@ -35,3 +35,13 @@ public class ValueError
         return this.s;
     }
 }
+
+public class NoPerm
+{
+    public func __str__()
+    {
+        return "对属性或方法没有操作权限";
+    }
+}
+
+final var _exc_no_perm = NoPerm();

@@ -1,8 +1,20 @@
 public class str
 {
     !<<
-    s   string
+    v   string
     !>>
+
+    public func __init__(x)
+    {
+        s = x.__str__();
+        if (!isinstanceof(s, str))
+        {
+            throw(TypeError("‘__str__’方法返回的对象不是字符串"));
+        }
+        !<<
+        this.v = l_s.v
+        !>>
+    }
 
     //todo
 }
@@ -11,7 +23,7 @@ public class str
 
 func sw_str_from_go_str(s string) *sw_cls_@<<:str>> {
     return &sw_cls_@<<:str>>{
-        s:  s,
+        v:  s,
     }
 }
 
