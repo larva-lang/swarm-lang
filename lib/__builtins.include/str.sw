@@ -6,7 +6,7 @@ public class str
 
     public func __init__(x)
     {
-        s = x.__str__();
+        var s = x.__str__();
         if (!isinstanceof(s, str))
         {
             throw(TypeError("‘__str__’方法返回的对象不是字符串"));

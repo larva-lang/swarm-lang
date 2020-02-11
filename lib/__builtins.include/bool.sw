@@ -4,9 +4,24 @@ public class bool
     v   bool
     !>>
 
-    //func __init__(x)  //bool的构造需要保证true或false的唯一性，由编译器特殊处理，不能直接实现
+    //bool的构造需要保证true或false的唯一性，由编译器特殊处理，不能直接实现，编译器对于代码bool(x)会调用到下面的cast_to_bool(x)
+    //func __init__(x)
 
     //todo
+}
+
+func cast_to_bool(x)
+{
+    var b = x.__bool__();
+    if (!isinstanceof(s, str))
+    {
+        throw(TypeError("‘__bool__’方法返回的对象不是bool对象"));
+    }
+    if (!(b is _bool_obj_true || b is _bool_obj_false))
+    {
+        abort("bool对象失去了唯一性");
+    }
+    return b;
 }
 
 final var (_bool_obj_true, _bool_obj_false);
