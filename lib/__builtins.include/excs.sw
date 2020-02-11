@@ -57,3 +57,47 @@ func sw_exc_make_no_perm_exc(info string) sw_obj {
 }
 
 !>>
+
+public class NoAttr
+{
+    var info;
+
+    public func __str__()
+    {
+        return info;
+    }
+}
+
+!<<
+
+func sw_exc_make_no_attr_exc(info string) sw_obj {
+    return &sw_cls_@<<:NoAttr>>{
+        m_info: &sw_cls_@<<:str>>{
+            v:  info,
+        },
+    }
+}
+
+!>>
+
+public class NoMethod
+{
+    var info;
+
+    public func __str__()
+    {
+        return info;
+    }
+}
+
+!<<
+
+func sw_exc_make_no_method_exc(info string) sw_obj {
+    return &sw_cls_@<<:NoMethod>>{
+        m_info: &sw_cls_@<<:str>>{
+            v:  info,
+        },
+    }
+}
+
+!>>

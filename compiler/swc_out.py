@@ -202,6 +202,9 @@ def _gen_new_obj_func_name(cls, arg_count):
 def _gen_func_obj_stru_name(arg_count):
     return "sw_fo_%d" % arg_count
 
+def _gen_throw_no_perm_exc(info):
+    return "%s(%s)" % (_gen_mod_elem_name(mod.builtins_mod.func_map[("throw", 1)]), "sw_exc_make_no_perm_exc(`%s`)" % info)
+
 #gens end-------------------------------------------------------------
 
 _BOOTER_START_PROG_FUNC_NAME = "Sw_booter_start_prog"
@@ -232,6 +235,15 @@ def _output_var_def_assign(code, var_def, expr, is_gv = False):
 
 def _output_stmt_list(code, stmt_list):
     todo
+
+def _output_attr_method_default(code, cls_stru_name, cls_name, attr_name):
+    exc_code = "sw_exc_make_no_attr_exc(`‘%s’没有属性‘%s’`)" % (cls_name, attr_name)
+    throw_exc_code = _gen_throw_exc(exc_code)
+    with code.new_blk("func (this *%s) %s(perm int64) sw_obj" % (cls_stru_name, _gen_get_attr_method_name(attr_name))):
+        code += throw_exc_code
+        code += 'panic("bug")'  #规避一下编译错误
+    with code.new_blk("func (this *%s) %s(perm int64, v sw_obj)" % (cls_stru_name, _gen_set_attr_method_name(attr_name))):
+        code += throw_exc_code
 
 _literal_token_id_set = set()
 
@@ -309,10 +321,16 @@ def _output_mod(mod):
 
             #属性的get和set方法
             for attr in cls.attr_map.itervalues():
+                def output_attr_perm_checking():
+                    if not attr.is_public:
+                        with code.new_blk("if perm != %d" % mod.id):
+                            code += _gen_throw_no_perm_exc("对属性‘%s’没有权限" % attr)
                 with code.new_blk("func (this *%s) %s(perm int64) sw_obj" % (sw_cls_name, _gen_get_attr_method_name(attr.name))):
-                    todo
+                    output_attr_perm_checking()
+                    code += "return this.m_%s" % attr.name
                 with code.new_blk("func (this *%s) %s(perm int64, v sw_obj)" % (sw_cls_name, _gen_set_attr_method_name(attr.name))):
-                    todo
+                    output_attr_perm_checking()
+                    code += "this.m_%s = v" % attr.name
 
             #用户定义方法
             usr_def_method_sign_set = set()
@@ -325,8 +343,7 @@ def _output_mod(mod):
                                   (sw_cls_name, sw_method_name, _gen_arg_def(method.arg_map, need_perm_arg = True))):
                     if not method.is_public:
                         with code.new_blk("if perm != %d" % mod.id):
-                            code += "%s(%s)" % (_gen_mod_elem_name(mod.builtins_mod.func_map[("throw", 1)]),
-                                                'sw_exc_make_no_perm_exc("对方法‘%s<%d>’没有调用权限")' % (method, arg_count))
+                            code += _gen_throw_no_perm_exc("对方法‘%s<%d>’没有调用权限" % (method, arg_count))
                     _output_stmt_list(code, method.stmt_list)
                     code += "return %s" % _gen_nil_literal()
                 if method.name == "__init__":
@@ -340,7 +357,7 @@ def _output_mod(mod):
 
             #补全其他属性的get和set
             for attr_name in swc_mod.all_attr_name_set - set(cls.attr_map):
-                todo
+                _output_attr_method_default(code, sw_cls_name, str(cls), attr_name)
 
             #补全其他方法
             for method_name, arg_count in _all_method_sign_set - usr_def_method_sign_set:
@@ -373,16 +390,21 @@ def _output_util():
 
         #所有函数对象类型的实现，就是针对所有出现的函数对象的参数数量，生成对应的匿名class实现
         for arg_count in set([len(func_obj.arg_map) for func_obj in swc_mod.func_objs]):
+            fo_name = "func<%d>" % arg_count
             fo_stru_name = _gen_func_obj_stru_name(arg_count)
             with code.new_blk("type %s struct" % fo_stru_name):
                 code += "f func (%s) sw_obj" % ", ".join(["sw_obj"] * arg_count)
+            #对应的call方法
             arg_name_list = [str(i) for i in xrange(arg_count)]
             with code.new_blk("func (this *%s) %s(%s) sw_obj" %
                               (fo_stru_name, _gen_method_name(("call", arg_count)), _gen_arg_def(arg_name_list, need_perm_arg = True))):
                 code += "return this.f(%s)" % ", ".join(["l_%s" % arg_name for arg_name in arg_name_list])
+            #内部使用的方法
+            with code.new_blk("func (this *%s) type_name() string" % fo_stru_name):
+                code += "return %s" % _gen_str_literal(fo_name)
             #补全属性的get和set
             for attr_name in swc_mod.all_attr_name_set:
-                todo
+                _output_attr_method_default(code, fo_stru_name, fo_name, attr_name)
             #补全其他方法
             for method_name, arg_count in _all_method_sign_set - set([("call", arg_count)]):
                 todo
