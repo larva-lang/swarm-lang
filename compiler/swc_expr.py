@@ -333,12 +333,12 @@ class Parser:
                         if obj_expr.op == "this":
                             method = self.cls.method_map.get((name, len(el)))
                             if method is None:
-                                t.syntax_err("类‘%s’没有参数个数为%d的方法‘%s’" % (self.cls, len(el), name))
+                                t.syntax_err("类‘%s’没有方法‘%s<%d>’" % (self.cls, name, len(el)))
                             parse_stk._push_expr(_Expr("call_this.method", (name, el)))
                         else:
                             if name != "call" and (name, len(el)) not in swc_mod.all_method_sign_set:
                                 #尽量检测一下，做不到完全
-                                t.syntax_err("程序中没有名为‘%s’且参数数量为%d个的方法" % (name, len(el)))
+                                t.syntax_err("程序中没有签名为‘%s<%d>’的方法" % (name, len(el)))
                             parse_stk._push_expr(_Expr("call_method", (obj_expr, name, el)))
                     else:
                         #属性访问
@@ -397,22 +397,20 @@ class Parser:
                     虽然bool(x)从形式上是用x构建bool类的实例（同时也是几个基础类型的转换语法），但是由于true和false是全局唯一的，
                     而Swarm不打算支持类似Python的__new__的机制，所以特殊处理下，其他对象则严格按new_obj进行
                     '''
-                    arg_map = swc_util.OrderedDict()
-                    arg_map["x"] = None
+                    if len(el) != 1:
+                        el_start_token("参数数量错误，构造‘bool’对象需要1个参数")
                     op = "cast_to_bool"
                 else:
                     construct_method = elem.get_construct_method(len(el))
                     if construct_method is None:
                         if el:
-                            name_token.syntax_err("无法创建‘%s.%s’的实例，构造方法没有参数数量为%d个的重载" % (mod, name, len(el)))
+                            name_token.syntax_err("无法创建‘%s.%s’的实例，没有构造方法‘__init__<%d>’" % (mod, name, len(el)))
                         #使用默认构造方法
                         construct_method_is_public = False
-                        arg_map = swc_util.OrderedDict()
                     else:
                         construct_method_is_public = construct_method.is_public
-                        arg_map = construct_method.arg_map
                     if not (construct_method_is_public or self.mod is mod):
-                        name_token.syntax_err("无法创建‘%s.%s’的实例，对构造方法没有权限" % (mod, name))
+                        name_token.syntax_err("无法创建‘%s.%s’的实例，对构造方法‘__init__<%d>’没有权限" % (mod, name, len(el)))
                     op = "new_obj"
             elif elem.is_func:
                 arg_count = len(el)
@@ -421,16 +419,12 @@ class Parser:
                     if len(elem.arg_map) == arg_count:
                         break
                 else:
-                    name_token.syntax_err("函数‘%s.%s’没有参数数量为%d个的重载" % (mod, name, arg_count))
+                    name_token.syntax_err("找不到函数‘%s.%s<%d>’" % (mod, name, arg_count))
                 if not (elem.is_public or self.mod is mod):
-                    name_token.syntax_err("无法调用参数数量为%d个的函数‘%s.%s’，无权限" % (arg_count, mod, name))
-                arg_map = elem.arg_map
+                    name_token.syntax_err("对函数‘%s.%s<%d>’无权限" % (mod, name, arg_count))
                 op = "call_func"
             else:
                 swc_util.abort()
-
-            if len(el) != len(arg_map):
-                el_start_token.syntax_err("参数数量错误，需要%d个" % len(arg_map))
 
             return _Expr(op, (elem, el))
 

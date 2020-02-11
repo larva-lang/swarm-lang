@@ -249,7 +249,7 @@ class _Cls(_ModElem):
             if name in self.attr_map:
                 t.syntax_err("方法名‘%s’和已定义的属性名冲突" % name)
             if (name, method_arg_count) in self.method_map:
-                t.syntax_err("已存在名为‘%s’的有%d个参数的方法" % (name, method_arg_count))
+                t.syntax_err("方法‘%s<%d>’已存在" % (name, method_arg_count))
 
     def _compile(self):
         for method in self.method_map.itervalues():
@@ -461,7 +461,7 @@ class Mod:
                 if name in i:
                     t.syntax_err("函数名和同模块中已定义的类名或全局变量名冲突")
             if (name, func_arg_count) in self.func_map:
-                t.syntax_err("函数重定义")
+                t.syntax_err("函数‘%s<%d>’重定义" % (name, func_arg_count))
 
     def iter_mod_elems(self):
         for m in self.cls_map, self.func_map, self.gv_map:

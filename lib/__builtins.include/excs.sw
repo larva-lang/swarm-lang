@@ -38,10 +38,22 @@ public class ValueError
 
 public class NoPerm
 {
+    var info;
+
     public func __str__()
     {
-        return "对属性或方法没有操作权限";
+        return info;
     }
 }
 
-final var _exc_no_perm = NoPerm();
+!<<
+
+func sw_exc_make_no_perm_exc(info string) sw_obj {
+    return &sw_cls_@<<:NoPerm>>{
+        m_info: &sw_cls_@<<:str>>{
+            v:  info,
+        },
+    }
+}
+
+!>>
