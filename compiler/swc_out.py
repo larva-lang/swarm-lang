@@ -256,7 +256,7 @@ def _gen_expr_code(expr):
         fmt_code = _gen_str_literal(fmt)
         for e in el:
             assert e.op == "to_go_fmt_str"
-        return "sw_util_sprintf(%s, %s)" % (fmt_code, _gen_el_code(el)) if el else fmt_code
+        return "sw_obj_str_from_go_str(sw_util_sprintf(%s, %s))" % (fmt_code, _gen_el_code(el)) if el else fmt_code
 
     if expr.op == "isinstanceof":
         e, cls = expr.arg
@@ -345,7 +345,7 @@ def _gen_expr_code(expr):
 
     if expr.op == "is": #is是特殊的双目运算
         ea, eb = expr.arg
-        return "(%s) == (%s)" % (_gen_expr_code(ea), _gen_expr_code(eb))
+        return "sw_obj_bool_from_go_bool((%s) == (%s))" % (_gen_expr_code(ea), _gen_expr_code(eb))
 
     if expr.op in ("&&", "||"):
         ea, eb = expr.arg
@@ -511,7 +511,7 @@ def _output_stmt_list(code, stmt_list):
                 imn_expr_code = "%s(%d, (%s))" % (_gen_method_name("__i_%s__" % imn, 1), mod.id, _gen_expr_code(stmt.expr))
                 code.record_tb_info(stmt.lvalue.pos_info)
                 if stmt.lvalue.op == "[]":
-                    obj_expr, key_expr = stmt.lvalue_code.arg
+                    obj_expr, key_expr = stmt.lvalue.arg
                     obj_tmp_var_name = _gen_tmp_var_name()
                     code += "var %s sw_obj = (%s)" % (obj_tmp_var_name, _gen_expr_code(obj_expr))
                     key_tmp_var_name = _gen_tmp_var_name()
@@ -548,7 +548,7 @@ def _output_stmt_list(code, stmt_list):
             with code.new_blk(""):
                 iter_var_name = _gen_tmp_var_name()
                 code.record_tb_info(stmt.iter_expr.pos_info)
-                code += "var %s sw_obj = (%s).iter()" % (iter_var_name, _gen_expr_code(stmt.iter_expr))
+                code += "var %s sw_obj = (%s).%s(%d)" % (iter_var_name, _gen_expr_code(stmt.iter_expr), _gen_method_name("iter", 0), mod.id)
                 for name in stmt.for_var_map:
                     code += "var l_%s sw_obj" % name
                 code.record_tb_info(stmt.iter_expr.pos_info)

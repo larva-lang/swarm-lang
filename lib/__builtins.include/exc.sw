@@ -1,7 +1,7 @@
 public func throw(exc)
 {
     !<<
-    panic(sw_exc_create_catched(exc, 0))
+    panic(sw_exc_create_catched(l_exc, 0))
     !>>
 }
 

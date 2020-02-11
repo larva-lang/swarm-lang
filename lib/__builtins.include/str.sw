@@ -35,7 +35,7 @@ public class str
     {
         var s = _to_str("str", x);
         !<<
-        this.v = l_s.v
+        this.v = l_s.(*sw_cls_@<<:str>>).v
         !>>
     }
 
@@ -126,7 +126,7 @@ public class str
             !<<
             this_len    := int64(len(this.v))
             count       := l_other.(*sw_cls_@<<:int>>).v
-            if count < 0 || (count > 0 && this_len * count / count != s_len) {
+            if count < 0 || (count > 0 && this_len * count / count != this_len) {
             !>>
                 throw(ValueError("‘str*count’运算参数错误，count=%d，字符串长度=%d".(other, this.len())));
             !<<
