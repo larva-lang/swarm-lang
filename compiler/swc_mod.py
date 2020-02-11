@@ -660,7 +660,7 @@ class _FuncObj:
         self.arg_map    = arg_map
         self.stmt_list  = None
 
-    __repr__ = __str__ = lambda self: "func_obj[%s:%s:%s:%s]" % (self.mod, os.path.base_name(self.func_token.src_fn),
+    __repr__ = __str__ = lambda self: "func_obj[%s:%s:%s:%s]" % (self.mod, os.path.basename(self.func_token.src_fn),
                                                                  self.func_token.line_idx + 1, self.func_token.pos + 1)
 
 func_obj_arg_count_set = set(xrange(0, 5))  #0到4个参数是默认有的，可用于Native代码直接使用，其他的在编译期间添加

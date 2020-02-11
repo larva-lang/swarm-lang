@@ -68,9 +68,9 @@ class Parser:
                 expr = self.expr_parser.parse(var_map_stk)
                 self.token_list.pop_sym(")")
                 self.token_list.pop_sym("{")
-                stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep + 1)
+                while_stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep + 1)
                 self.token_list.pop_sym("}")
-                stmt_list.append(_Stmt("while", expr = expr, stmt_list = stmt_list))
+                stmt_list.append(_Stmt("while", expr = expr, stmt_list = while_stmt_list))
                 continue
 
             if t.is_reserved("if"):

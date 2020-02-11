@@ -289,7 +289,7 @@ def _gen_expr_code(expr):
 
     if expr.op == "call_this.method":
         name, el = expr.arg
-        return "this.%s(%s)" % (_gen_method_name(name), _gen_el_code(el, with_perm = True))
+        return "this.%s(%s)" % (_gen_method_name(name, len(el)), _gen_el_code(el, with_perm = True))
 
     if expr.op == ".":
         e, name = expr.arg
@@ -297,7 +297,7 @@ def _gen_expr_code(expr):
 
     if expr.op == "call_method":
         e, name, el = expr.arg
-        return "(%s).%s(%s)" % (_gen_expr_code(e), _gen_method_name(name), _gen_el_code(el, with_perm = True))
+        return "(%s).%s(%s)" % (_gen_expr_code(e), _gen_method_name(name, len(el)), _gen_el_code(el, with_perm = True))
 
     if expr.op == "call_func":
         func, el = expr.arg
@@ -321,20 +321,18 @@ def _gen_expr_code(expr):
         kvel = expr.arg
         ecl = ["%s().reserve_space(sw_obj_int_from_go_int(%d))" % (_gen_new_obj_func_name(_get_builtins_cls("dict"), 0), len(kvel))]
         for ek, ev in kvel:
-            ecl.append(".%s(%d, (%s), (%s))" % (_gen_method_name("__setelem__"), mod.id, _gen_expr_code(ek), _gen_expr_code(ev)))
+            ecl.append(".%s(%d, (%s), (%s))" % (_gen_method_name("__setelem__", 2), mod.id, _gen_expr_code(ek), _gen_expr_code(ev)))
         return "".join(ecl)
 
     if expr.op == "[:]":
         e, begin_e, end_e = lvalue.arg
         begin_ecode = _gen_nil_literal() if begin_e is None else _gen_expr_code(begin_e)
         end_ecode   = _gen_nil_literal() if end_e is None else _gen_expr_code(end_e)
-        code += "(%s).%s(%d, (%s), (%s))" % (_gen_expr_code(e), _gen_method_name("__getslice__"), mod.id, begin_ecode, end_ecode)
-        return
+        return "(%s).%s(%d, (%s), (%s))" % (_gen_expr_code(e), _gen_method_name("__getslice__", 2), mod.id, begin_ecode, end_ecode)
 
     if expr.op == "[]":
         e, ke = expr.arg
-        code += "(%s).%s(%d, %s)" % (_gen_expr_code(e), _gen_method_name("__getelem__"), mod.id, _gen_expr_code(ke))
-        return
+        return "(%s).%s(%d, %s)" % (_gen_expr_code(e), _gen_method_name("__getelem__", 1), mod.id, _gen_expr_code(ke))
 
     if expr.op == "!":  #bool not特殊处理
         e = expr.arg
@@ -442,7 +440,7 @@ def _output_simple_assign(code, lvalue, expr_or_expr_code):
         if lvalue.op == "[]":
             obj_expr, key_expr = lvalue.arg
             code += ("(%s).%s(%d, (%s), (%s))" %
-                     (_gen_expr_code(obj_expr), _gen_method_name("__setelem__"), mod.id, _gen_expr_code(key_expr), expr_code))
+                     (_gen_expr_code(obj_expr), _gen_method_name("__setelem__", 2), mod.id, _gen_expr_code(key_expr), expr_code))
             return
 
         if lvalue.op == "[:]":
@@ -450,7 +448,7 @@ def _output_simple_assign(code, lvalue, expr_or_expr_code):
             begin_ecode = _gen_nil_literal() if begin_e is None else _gen_expr_code(begin_e)
             end_ecode   = _gen_nil_literal() if end_e is None else _gen_expr_code(end_e)
             code += ("(%s).%s(%d, (%s), (%s), (%s))" %
-                     (_gen_expr_code(obj_expr), _gen_method_name("__setslice__"), mod.id, begin_ecode, end_ecode, expr_code))
+                     (_gen_expr_code(obj_expr), _gen_method_name("__setslice__", 3), mod.id, begin_ecode, end_ecode, expr_code))
             return
 
         if lvalue.op == "this.attr":
@@ -496,9 +494,10 @@ def _output_stmt_list(code, stmt_list):
             continue
 
         if stmt.type == "var_def":
-            for name in stmt.var_def.iter_names():
-                code += "var l_%s sw_obj"
-            _output_simple_assign(code, stmt.var_def.to_lvalue(), stmt.expr)
+            for _, name in stmt.var_def.iter_names():
+                code += "var l_%s sw_obj" % name
+            if stmt.init_expr is not None:
+                _output_simple_assign(code, stmt.var_def.to_lvalue(), stmt.init_expr)
             continue
 
         if stmt.type == "assign":
@@ -509,7 +508,7 @@ def _output_stmt_list(code, stmt_list):
                 aug_op = stmt.sym[: -1]
                 assert aug_op in _BINOCULAR_OP_2_INTERNAL_METHOD
                 imn = _BINOCULAR_OP_2_INTERNAL_METHOD[aug_op]
-                imn_expr_code = "%s(%d, (%s))" % (_gen_method_name("__i_%s__" % imn), mod.id, _gen_expr_code(stmt.expr))
+                imn_expr_code = "%s(%d, (%s))" % (_gen_method_name("__i_%s__" % imn, 1), mod.id, _gen_expr_code(stmt.expr))
                 code.record_tb_info(stmt.lvalue.pos_info)
                 if stmt.lvalue.op == "[]":
                     obj_expr, key_expr = stmt.lvalue_code.arg
@@ -520,8 +519,8 @@ def _output_stmt_list(code, stmt_list):
                     code += "var %s sw_obj = (%s)" % (key_tmp_var_name, _gen_expr_code(key_expr))
                     code.record_tb_info(stmt.lvalue.pos_info)
                     code += ("%s.%s(%d, %s, %s.%s(%d, %s).%s)" %
-                             (obj_tmp_var_name, _gen_method_name("__setelem__"), mod.id, key_tmp_var_name, obj_tmp_var_name,
-                              _gen_method_name("__getelem__"), mod.id, key_tmp_var_name, imn_expr_code))
+                             (obj_tmp_var_name, _gen_method_name("__setelem__", 2), mod.id, key_tmp_var_name, obj_tmp_var_name,
+                              _gen_method_name("__getelem__", 1), mod.id, key_tmp_var_name, imn_expr_code))
                 elif stmt.lvalue.op == ".":
                     obj_expr, name = stmt.lvalue.arg
                     tmp_var_name = _gen_tmp_var_name()
@@ -551,11 +550,12 @@ def _output_stmt_list(code, stmt_list):
                 code.record_tb_info(stmt.iter_expr.pos_info)
                 code += "var %s sw_obj = (%s).iter()" % (iter_var_name, _gen_expr_code(stmt.iter_expr))
                 for name in stmt.for_var_map:
-                    code += "var l_%s sw_obj"
+                    code += "var l_%s sw_obj" % name
                 code.record_tb_info(stmt.iter_expr.pos_info)
                 with code.new_blk("for sw_obj_to_go_bool(%s)" % iter_var_name, start_with_blank_line = False):
                     code.record_tb_info(stmt.iter_expr.pos_info)
-                    _output_simple_assign(code, stmt.for_var_def.to_lvalue(), "%s.%s(%d)" % (iter_var_name, _gen_method_name("next"), mod.id))
+                    _output_simple_assign(
+                        code, stmt.for_var_def.to_lvalue(), "%s.%s(%d)" % (iter_var_name, _gen_method_name("next", 0), mod.id))
                     _output_stmt_list(code, stmt.stmt_list)
             continue
 
