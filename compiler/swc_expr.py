@@ -348,6 +348,8 @@ class Parser:
                                 t.syntax_err("类‘%s’没有属性‘%s’" % (self.cls, name))
                             parse_stk._push_expr(_Expr("this.attr", name))
                         else:
+                            if name not in swc_mod.all_attr_name_set:
+                                t.syntax_err("程序中没有名为‘%s’的属性" % name)
                             parse_stk._push_expr(_Expr(".", (obj_expr, name)))
 
                 else:
@@ -369,12 +371,18 @@ class Parser:
         return parse_stk.finish()
 
     def _parse_mod_elem_expr(self, mod, name_token, name, var_map_stk):
-        elem = mod.get_elem(name)
-        if elem is None:
+        elems = mod.get_elems(name)
+        if not elems:
             name_token.syntax_err("找不到‘%s.%s’" % (mod, name))
 
-        if not (elem.is_public or self.mod is mod):
-            name_token.syntax_err("无法访问‘%s.%s’，没有权限" % (mod, name))
+        elem = elems[0]
+        if elem.is_cls or elem.is_gv:
+            assert len(elems) == 1
+            if not (elem.is_public or self.mod is mod):
+                name_token.syntax_err("无法访问‘%s.%s’，没有权限" % (mod, name))
+
+        if elem.is_gv:
+            return _Expr("gv", elem)
 
         if elem.is_cls or elem.is_func:
             #类和函数的使用都是直接调用
@@ -384,20 +392,38 @@ class Parser:
 
             if elem.is_cls:
                 #调用的是类的构造函数，获取其参数表
-                construct_method = elem.get_construct_method(len(el))
-                if construct_method is None:
-                    if el:
-                        name_token.syntax_err("无法创建‘%s.%s’的实例，没有参数数量为%d的构造方法" % (mod, name, len(el)))
-                    #使用默认构造方法
-                    construct_method_is_public = False
+                if mod is swc_mod.builtins_mod and name == "bool":
+                    '''
+                    虽然bool(x)从形式上是用x构建bool类的实例（同时也是几个基础类型的转换语法），但是由于true和false是全局唯一的，
+                    而Swarm不打算支持类似Python的__new__的机制，所以特殊处理下，其他对象则严格按new_obj进行
+                    '''
                     arg_map = swc_util.OrderedDict()
+                    arg_map["x"] = None
+                    op = "cast_to_bool"
                 else:
-                    construct_method_is_public = construct_method.is_public
-                    arg_map = construct_method.arg_map
-                if not (construct_method_is_public or self.mod is mod):
-                    name_token.syntax_err("无法创建‘%s.%s’的实例，对构造方法没有权限" % (mod, name))
-                op = "new_obj"
+                    construct_method = elem.get_construct_method(len(el))
+                    if construct_method is None:
+                        if el:
+                            name_token.syntax_err("无法创建‘%s.%s’的实例，构造方法没有参数数量为%d个的重载" % (mod, name, len(el)))
+                        #使用默认构造方法
+                        construct_method_is_public = False
+                        arg_map = swc_util.OrderedDict()
+                    else:
+                        construct_method_is_public = construct_method.is_public
+                        arg_map = construct_method.arg_map
+                    if not (construct_method_is_public or self.mod is mod):
+                        name_token.syntax_err("无法创建‘%s.%s’的实例，对构造方法没有权限" % (mod, name))
+                    op = "new_obj"
             elif elem.is_func:
+                arg_count = len(el)
+                for elem in elems:
+                    assert elem.name == name
+                    if len(elem.arg_map) == arg_count:
+                        break
+                else:
+                    name_token.syntax_err("函数‘%s.%s’没有参数数量为%d个的重载" % (mod, name, arg_count))
+                if not (elem.is_public or self.mod is mod):
+                    name_token.syntax_err("无法调用参数数量为%d个的函数‘%s.%s’，无权限" % (arg_count, mod, name))
                 arg_map = elem.arg_map
                 op = "call_func"
             else:
@@ -407,9 +433,6 @@ class Parser:
                 el_start_token.syntax_err("参数数量错误，需要%d个" % len(arg_map))
 
             return _Expr(op, (elem, el))
-
-        if elem.is_gv:
-            return _Expr("gv", elem)
 
         swc_util.abort()
 

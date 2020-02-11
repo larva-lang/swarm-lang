@@ -10,7 +10,8 @@ builtins_mod = None
 main_mod = None
 mod_map = swc_util.OrderedDict()
 
-all_method_sign_set = swc_util.OrderedSet()  #用于存储所有定义的方法的签名，元素为(方法名, 参数数量)
+all_attr_name_set   = swc_util.OrderedSet() #用于存储所有定义的属性名字
+all_method_sign_set = swc_util.OrderedSet() #用于存储所有定义的方法的签名，元素为(方法名, 参数数量)
 
 def _parse_decr_set(token_list):
     decr_set = set()
@@ -142,6 +143,8 @@ class _Attr:
         self.name_token = name_token
         self.name       = name
 
+        all_attr_name_set.add(self.name)
+
     __repr__ = __str__ = lambda self : "%s.%s" % (self.cls, self.name)
 
 class _Method:
@@ -224,7 +227,7 @@ class _Cls(_ModElem):
                 arg_map = _parse_arg_map(token_list)
                 token_list.pop_sym(")")
                 arg_count = len(arg_map)
-                self._check_redefine(t, name, arg_count)
+                self._check_redefine(t, name, method_arg_count = arg_count)
                 token_list.pop_sym("{")
                 block_token_list, sym = swc_token.parse_token_list_until_sym(token_list, ("}",))
                 assert sym == "}"
@@ -315,6 +318,7 @@ class Mod:
         self.gnc_list       = []
         self.cls_map        = swc_util.OrderedDict()
         self.func_map       = swc_util.OrderedDict()
+        self.func_name_set  = swc_util.OrderedSet()
         self.gv_map         = swc_util.OrderedDict()
         self.gv_init_list   = []
         self.gfo_list       = []
@@ -418,14 +422,15 @@ class Mod:
 
     def _parse_func(self, decr_set, token_list):
         t, name = token_list.pop_name()
-        self._check_redefine(t, name)
         token_list.pop_sym("(")
         arg_map = _parse_arg_map(token_list)
         token_list.pop_sym(")")
+        self._check_redefine(t, name, func_arg_count = len(arg_map))
         token_list.pop_sym("{")
         block_token_list, sym = swc_token.parse_token_list_until_sym(token_list, ("}",))
         assert sym == "}"
-        self.func_map[name] = _Func(self, decr_set, t, name, arg_map, block_token_list)
+        self.func_map[(name, len(arg_map))] = _Func(self, decr_set, t, name, arg_map, block_token_list)
+        self.func_name_set.add(name)
 
     def _parse_gv(self, decr_set, token_list):
         var_def = swc_expr.parse_var_def(token_list)
@@ -442,29 +447,37 @@ class Mod:
         assert sym == ";"
         self.gv_init_list.append(_GvInit(self, var_def, block_token_list))
 
-    def _check_redefine(self, t, name):
+    def _check_redefine(self, t, name, func_arg_count = None):
         if name in self.dep_mod_set:
             t.syntax_err("定义的名字和导入模块名重名")
-        for i in self.cls_map, self.func_map, self.gv_map:
-            if name in i:
-                t.syntax_err("名字重定义")
+        if func_arg_count is None:
+            #类或全局变量
+            for i in self.cls_map, self.func_name_set, self.gv_map:
+                if name in i:
+                    t.syntax_err("与同模块中已定义的其他名字冲突")
+        else:
+            #函数
+            for i in self.cls_map, self.gv_map:
+                if name in i:
+                    t.syntax_err("函数名和同模块中已定义的类名或全局变量名冲突")
+            if (name, func_arg_count) in self.func_map:
+                t.syntax_err("函数重定义")
 
     def iter_mod_elems(self):
         for m in self.cls_map, self.func_map, self.gv_map:
             for elem in m.itervalues():
                 yield elem
 
-    def get_elem(self, name):
+    def get_elems(self, name):
+        elems = []
         for elem in self.iter_mod_elems():
             if elem.name == name:
-                return elem
-        else:
-            return None
+                elems.append(elem)
+        return elems
 
     def public_name_set(self):
         name_set = set()
         for elem in self.iter_mod_elems():
-            assert elem.name not in name_set
             if elem.is_public:
                 name_set.add(elem.name)
         return name_set
@@ -472,7 +485,6 @@ class Mod:
     def name_set(self):
         name_set = set()
         for elem in self.iter_mod_elems():
-            assert elem.name not in name_set
             name_set.add(elem.name)
         return name_set
 
@@ -498,17 +510,15 @@ class Mod:
 
     def _check_main_func(self):
         assert self is main_mod
-        if "main" not in self.func_map:
+        main_func = self.func_map.get(("main", 0))
+        if main_func is None:
             swc_util.exit("主模块‘%s’没有main函数" % self)
-        main_func = self.func_map["main"]
         if not main_func.is_public:
             swc_util.exit("主模块‘%s’的main函数必须是public的" % self)
-        if len(main_func.arg_map) != 0:
-            swc_util.exit("主模块‘%s’的main函数不能有参数" % self)
 
     def get_main_func(self):
-        assert self is main_mod and "main" in self.func_map
-        return self.func_map["main"]
+        assert self is main_mod
+        return self.func_map[("main", 0)]
 
     def _compile(self):
         for m in self.cls_map, self.func_map:

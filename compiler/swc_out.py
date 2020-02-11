@@ -143,12 +143,16 @@ def _init_all_method_sign_set():
     for func_obj in swc_mod.func_objs:
         _all_method_sign_set.add(("call", len(func_obj.arg_map)))
 
-def _gen_init_mod_func_name(mod):
-    return "sw_env_init_mod_" + mod.name
+def _gen_mod_name_code(mod):
+    return "%d_%s" % (len(mod.name), mod.name)
 
-def _gen_func_name(func):
-    assert func.is_func
-    return "sw_func_%d_%s_%d_%s" % (len(func.mod.name), func.mod.name, len(func.name), func.name)
+def _gen_init_mod_func_name(mod):
+    return "sw_env_init_mod_" + _gen_mod_name_code(mod)
+
+def _gen_mod_elem_name_code(elem):
+    for i in "cls", "func", "gv":
+        if eval("elem.is_%s" % i):
+            return "sw_%s_%s_%d_%s" % (i, _gen_mod_name_code(elem.mod), len(elem.name), elem.name)
 
 def _gen_str_literal(s):
     code_list = []
@@ -160,6 +164,18 @@ def _gen_str_literal(s):
         else:
             code_list.append(c)
     return '"%s"' % "".join(code_list)
+
+def _gen_method_name(name, arg_count):
+    return "sw_method_%s_%d" % (name, arg_count)
+
+def _gen_get_attr_method_name(name):
+    return "sw_attr_%s" % name
+
+def _gen_set_attr_method_name(name):
+    return "sw_setattr_%s" % name
+
+def _gen_literal_name_code(t):
+    return "sw_literal_%d" % t.id
 
 _BOOTER_START_PROG_FUNC_NAME = "Sw_booter_start_prog"
 
@@ -179,10 +195,79 @@ def _output_booter():
             code += ("sw_booter_start_prog(%s, %s, %s)" %
                      (init_std_lib_internal_mods_func_name,
                       _gen_init_mod_func_name(swc_mod.main_mod),
-                      _gen_func_name(swc_mod.main_mod.get_main_func())))
+                      _gen_mod_elem_name_code(swc_mod.main_mod.get_main_func())))
+
+def _output_native_code(code, nc, fom):
+    todo
+
+def _output_var_def_assign(code, var_def, expr, is_gv = False):
+    todo
+
+def _output_stmt_list(code, stmt_list):
+    todo
+
+_literal_token_id_set = set()
 
 def _output_mod(mod):
-    "todo"
+    mod_file_name = "%s/%s.mod.%s.M.go" % (_out_prog_dir, _prog_pkg_name, _gen_mod_name_code(mod))
+    with _Code(mod_file_name) as code:
+        #全局域的native code
+        for nc in mod.gnc_list:
+            _output_native_code(code, nc, "")
+
+        #字面量集合定义
+        code += ""
+        for t in mod.literal_list:
+            assert t.id not in _literal_token_id_set
+            _literal_token_id_set.add(t.id)
+            prefix = "literal_"
+            assert t.is_literal and t.type.startswith(prefix)
+            literal_type = t.type[len(prefix) :]
+            if literal_type in ("nil", "bool"):
+                #这两个类型的字面量是全局唯一的，直接体现在目标代码中
+                continue
+            if literal_type in ("int", "uint"):
+                v = str(t.value)
+            elif literal_type == "float":
+                v = t.value.hex()
+            elif literal_type == "str":
+                v = _gen_str_literal(t.value)
+            else:
+                swc_util.abort()
+            code += ("var %s swc_obj = &%s{v: (%s)}" %
+                     (_gen_literal_name_code(t), _gen_mod_elem_name_code(swc_mod.builtins_mod.cls_map[literal_type]), v))
+
+        #全局变量定义
+        code += ""
+        for gv in mod.gv_map.itervalues():
+            code += "var %s swc_obj = sw_obj_get_nil()" % _gen_mod_elem_name_code(gv)
+
+        #模块初始化
+        code += ""
+        mod_inited_flag_name = "sw_env_inited_flag_of_mod_%s" % _gen_mod_name_code(mod)
+        code += "var %s bool = false" % mod_inited_flag_name
+        with code.new_blk("func %s()" % _gen_init_mod_func_name(mod), start_with_blank_line = False):
+            with code.new_blk("if !%s" % mod_inited_flag_name):
+                code += "%s = true" % mod_inited_flag_name
+                for dep_mod_name in mod.dep_mod_set:
+                    code += "%s()" % _gen_init_mod_func_name(swc_mod.mod_map[dep_mod_name])
+                '''
+                for gv in module.global_var_map.itervalues():
+                    if gv.expr is not None:
+                        code.record_tb_info(gv.expr.pos_info)
+                        code += "%s = %s" % (_gen_gv_name(gv), _gen_expr_code(gv.expr))
+                '''
+                for gv_init in mod.gv_init_list:
+                    _output_var_def_assign(gv_init.var_def, gv_init.expr, is_gv = True)
+
+        #函数定义
+        for func in mod.func_map.itervalues():
+            with code.new_blk("func %s(%s) sw_obj" % (_gen_func_name(func), _gen_arg_def(func.arg_map))):
+                _output_stmt_list(code, func.stmt_list)
+                code += "return %s" % _gen_mod_elem_name_code(swc_mod.builtins_mod.gv_map["nil_obj"])
+
+
+    for todo
 
 def _output_util():
     with _Code("%s/%s.util.go" % (_out_prog_dir, _prog_pkg_name)) as code:
@@ -199,8 +284,13 @@ def _output_util():
 
         #sw_obj的定义
         with code.new_blk("type sw_obj interface"):
+            code += "type_name() string"
+            code += "check_permission(int64) sw_obj"
+            for name in swc_mod.all_attr_name_set:
+                code += "%s() sw_obj" % (_gen_get_attr_method_name(name))
+                code += "%s(sw_obj)" % (_gen_set_attr_method_name(name))
             for name, arg_count in _all_method_sign_set:
-                code += "%s(%s) sw_obj" % (name, ", ".join(["sw_obj"] * arg_count))
+                code += "%s(%s) sw_obj" % (_gen_method_name(name, arg_count), ", ".join(["sw_obj"] * arg_count))
 
 def _make_prog():
     if platform.system() in ("Darwin", "Linux"):
