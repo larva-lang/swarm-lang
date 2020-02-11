@@ -143,16 +143,19 @@ def _init_all_method_sign_set():
     for func_obj in swc_mod.func_objs:
         _all_method_sign_set.add(("call", len(func_obj.arg_map)))
 
-def _gen_mod_name_code(mod):
+#gens-------------------------------------------------------------
+
+def _gen_mod_name(mod):
     return "%d_%s" % (len(mod.name), mod.name)
 
 def _gen_init_mod_func_name(mod):
-    return "sw_env_init_mod_" + _gen_mod_name_code(mod)
+    return "sw_env_init_mod_" + _gen_mod_name(mod)
 
-def _gen_mod_elem_name_code(elem):
+def _gen_mod_elem_name(elem):
     for i in "cls", "func", "gv":
         if eval("elem.is_%s" % i):
-            return "sw_%s_%s_%d_%s" % (i, _gen_mod_name_code(elem.mod), len(elem.name), elem.name)
+            suffix = "_%d" % len(elem.arg_map) if i == "func" else ""
+            return "sw_%s_%s_%d_%s%s" % (i, _gen_mod_name(elem.mod), len(elem.name), elem.name, suffix)
 
 def _gen_str_literal(s):
     code_list = []
@@ -174,8 +177,19 @@ def _gen_get_attr_method_name(name):
 def _gen_set_attr_method_name(name):
     return "sw_setattr_%s" % name
 
-def _gen_literal_name_code(t):
+def _gen_literal_name(t):
     return "sw_literal_%d" % t.id
+
+def _gen_arg_def(arg_map):
+    return ", ".join(["l_%s sw_obj" % name for name in arg_map])
+
+def _gen_nil_literal():
+    return _gen_mod_elem_name(swc_mod.builtins_mod.gv_map["nil_obj"])
+
+def _gen_bool_literal(b):
+    return _gen_mod_elem_name(swc_mod.builtins_mod.gv_map["bool_obj_%s" % bool(b)])
+
+#gens end-------------------------------------------------------------
 
 _BOOTER_START_PROG_FUNC_NAME = "Sw_booter_start_prog"
 
@@ -195,7 +209,7 @@ def _output_booter():
             code += ("sw_booter_start_prog(%s, %s, %s)" %
                      (init_std_lib_internal_mods_func_name,
                       _gen_init_mod_func_name(swc_mod.main_mod),
-                      _gen_mod_elem_name_code(swc_mod.main_mod.get_main_func())))
+                      _gen_mod_elem_name(swc_mod.main_mod.get_main_func())))
 
 def _output_native_code(code, nc, fom):
     todo
@@ -209,7 +223,7 @@ def _output_stmt_list(code, stmt_list):
 _literal_token_id_set = set()
 
 def _output_mod(mod):
-    mod_file_name = "%s/%s.mod.%s.M.go" % (_out_prog_dir, _prog_pkg_name, _gen_mod_name_code(mod))
+    mod_file_name = "%s/%s.mod.%s.M.go" % (_out_prog_dir, _prog_pkg_name, _gen_mod_name(mod))
     with _Code(mod_file_name) as code:
         #全局域的native code
         for nc in mod.gnc_list:
@@ -235,16 +249,16 @@ def _output_mod(mod):
             else:
                 swc_util.abort()
             code += ("var %s swc_obj = &%s{v: (%s)}" %
-                     (_gen_literal_name_code(t), _gen_mod_elem_name_code(swc_mod.builtins_mod.cls_map[literal_type]), v))
+                     (_gen_literal_name(t), _gen_mod_elem_name(swc_mod.builtins_mod.cls_map[literal_type]), v))
 
         #全局变量定义
         code += ""
         for gv in mod.gv_map.itervalues():
-            code += "var %s swc_obj = sw_obj_get_nil()" % _gen_mod_elem_name_code(gv)
+            code += "var %s swc_obj = sw_obj_get_nil()" % _gen_mod_elem_name(gv)
 
         #模块初始化
         code += ""
-        mod_inited_flag_name = "sw_env_inited_flag_of_mod_%s" % _gen_mod_name_code(mod)
+        mod_inited_flag_name = "sw_env_inited_flag_of_mod_%s" % _gen_mod_name(mod)
         code += "var %s bool = false" % mod_inited_flag_name
         with code.new_blk("func %s()" % _gen_init_mod_func_name(mod), start_with_blank_line = False):
             with code.new_blk("if !%s" % mod_inited_flag_name):
@@ -262,12 +276,12 @@ def _output_mod(mod):
 
         #函数定义
         for func in mod.func_map.itervalues():
-            with code.new_blk("func %s(%s) sw_obj" % (_gen_func_name(func), _gen_arg_def(func.arg_map))):
+            with code.new_blk("func %s(%s) sw_obj" % (_gen_mod_elem_name(func), _gen_arg_def(func.arg_map))):
                 _output_stmt_list(code, func.stmt_list)
-                code += "return %s" % _gen_mod_elem_name_code(swc_mod.builtins_mod.gv_map["nil_obj"])
+                code += "return %s" % _gen_nil_literal()
 
-
-    for todo
+        #类的定义
+        todo
 
 def _output_util():
     with _Code("%s/%s.util.go" % (_out_prog_dir, _prog_pkg_name)) as code:
