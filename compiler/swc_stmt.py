@@ -144,7 +144,10 @@ class Parser:
                 expr_token.syntax_err("不能对多左值进行增量赋值")
             expr = self.expr_parser.parse(var_map_stk)
             self.token_list.pop_sym(";")
-            self.stmt_list.append(_Stmt("assign", lvalue = lvalue, expr = expr))
+            final_gv = lvalue.get_final_gv()
+            if final_gv is not None:
+                expr_token.syntax_err("不能对final修饰的全局变量‘%s’赋值" % final_gv)
+            self.stmt_list.append(_Stmt("assign", lvalue = lvalue, sym = sym, expr = expr))
 
     def def_func_obj(self, func_obj):
         self.stmt_list.append(_Stmt("def_func_obj", func_obj = func_obj))

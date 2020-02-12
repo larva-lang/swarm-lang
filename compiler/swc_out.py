@@ -224,8 +224,23 @@ def _output_native_code(code, nc, fom):
             code.record_tb_info((FakeToken(line_idx), fom))
             code += s
 
-def _output_var_def_assign(code, var_def, expr, is_gv = False):
-    "todo"
+def _output_simple_assign(code, lvalue, expr):
+    def output_simple_assign_ex(code, lvalue, expr_code):
+        if lvalue.op == "gv":
+            gv = lvalue.arg
+            assert not gv.is_final
+            code += "%s = (%s)" % (_gen_mod_elem_name(gv), expr_code)
+
+        todo
+
+        else:
+            assert lvalue.op == "tuple"
+            todo
+        #"gv", "lv", "[]", "[:]", "this.attr", ".") or (op == "tuple"
+        "todo"
+
+    assert lvalue.is_lvalue
+    output_simple_assign_ex(code, lvalue, _gen_expr_code(expr))
     '''
     for gv in module.global_var_map.itervalues():
         if gv.expr is not None:
@@ -344,7 +359,7 @@ def _output_mod(mod):
                 for dep_mod_name in mod.dep_mod_set:
                     code += "%s()" % _gen_init_mod_func_name(swc_mod.mod_map[dep_mod_name])
                 for gv_init in mod.gv_init_list:
-                    _output_var_def_assign(code, gv_init.var_def, gv_init.expr, is_gv = True)
+                    _output_simple_assign(code, gv_init.var_def.to_lvalue(mod), gv_init_list.expr)
 
         #函数定义
         for func in mod.func_map.itervalues():

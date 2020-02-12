@@ -3,9 +3,8 @@
 import swc_util, swc_mod, swc_token
 
 class _VarDef:
-    def __init__(self, vd, mod):
+    def __init__(self, vd):
         self.vd     = vd
-        self.mod    = mod
 
     def iter_names(self):
         def iter_vd(vd):
@@ -19,7 +18,17 @@ class _VarDef:
 
         return iter_vd(self.vd)
 
-def parse_var_def(token_list, mod = None):
+    def to_lvalue(self, mod = None):
+        def vd_to_lvalue(vd):
+            if isinstance(vd, tuple):
+                t, name = vd
+                return _Expr("lv", name) if mod is None else _Expr("gv", mod.gv_map[name])
+            assert isinstance(vd, list)
+            return _Expr("tuple", [vd_to_lvalue(sub_vd) for sub_vd in vd])
+
+        return vd_to_lvalue(self.vd)
+
+def parse_var_def(token_list):
     def parse_vd():
         t = token_list.pop()
         if t.is_name:
@@ -41,7 +50,7 @@ def parse_var_def(token_list, mod = None):
                 break
         return vd
 
-    return _VarDef(parse_vd(), mod)
+    return _VarDef(parse_vd())
 
 _UNARY_OP_SET = set(["~", "!", "neg", "pos"])
 _BINOCULAR_OP_SET = swc_token.BINOCULAR_OP_SYM_SET | set(["is"])
@@ -72,6 +81,20 @@ class _Expr:
         self.is_lvalue = op in ("gv", "lv", "[]", "[:]", "this.attr", ".") or (op == "tuple" and all([elem.is_lvalue for elem in arg]))
 
         self.pos_info = None #位置信息，只有在解析栈finish时候才会被赋值为解析栈的开始位置，参考相关代码，主要用于output时候的代码位置映射构建
+
+    def get_final_gv(self):
+        assert self.is_lvalue
+        if self.op == "gv":
+            gv = self.arg
+            return gv if gv.is_final else None
+        if self.op == "tuple":
+            for lvalue in self.arg:
+                final_gv = lvalue.get_final_gv()
+                if final_gv is not None:
+                    return final_gv
+            else:
+                return None
+        return None
 
 class _ParseStk:
     #解析表达式时使用的栈
