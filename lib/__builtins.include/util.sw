@@ -10,3 +10,15 @@ public func abort(s)
     }
     !>>
 }
+
+!<<
+
+func sw_util_sprintf(format string, args ...[]interface{}) string {
+    return fmt.Sprintf(format, args...)
+}
+
+func sw_util_obj_addr(x sw_obj) uint64 {
+    return uint64(reflect.ValueOf(&x).Elem().InterfaceData()[1])
+}
+
+!>>
