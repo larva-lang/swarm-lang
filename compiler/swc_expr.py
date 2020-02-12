@@ -322,7 +322,7 @@ class Parser:
                 if e.op == "this":
                     #对this做判断需要特殊处理下
                     assert self.cls is not None
-                    parse_stk._push_expr(_Expr("isinstanceof_this", cls is self.cls)
+                    parse_stk._push_expr(_Expr("isinstanceof_this", cls is self.cls))
                 else:
                     parse_stk._push_expr(_Expr("isinstanceof", (e, cls)))
 

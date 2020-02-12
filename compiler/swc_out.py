@@ -500,6 +500,7 @@ def _output_stmt_list(code, stmt_list):
         if stmt.type == "var_def":
             for _, name in stmt.var_def.iter_names():
                 code += "var l_%s sw_obj" % name
+                code += "_ = l_%s" % name
             if stmt.init_expr is not None:
                 _output_simple_assign(code, stmt.var_def.to_lvalue(), stmt.init_expr)
             continue
@@ -555,6 +556,7 @@ def _output_stmt_list(code, stmt_list):
                 code += "var %s sw_obj = (%s).%s(%d)" % (iter_var_name, _gen_expr_code(stmt.iter_expr), _gen_method_name("iter", 0), mod.id)
                 for name in stmt.for_var_map:
                     code += "var l_%s sw_obj" % name
+                    code += "_ = l_%s" % name
                 code.record_tb_info(stmt.iter_expr.pos_info)
                 with code.new_blk("for sw_obj_to_go_bool(%s)" % iter_var_name, start_with_blank_line = False):
                     code.record_tb_info(stmt.iter_expr.pos_info)
