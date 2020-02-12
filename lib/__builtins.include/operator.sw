@@ -8,7 +8,7 @@ func _cmp_oper(op, a, b)
 {
     var result;
     !<<
-    switch op.(*sw_cls_@<<:str>>).v {
+    switch l_op.(*sw_cls_@<<:str>>).v {
     case "lt":
     !>>
         result = a.__lt__(b);

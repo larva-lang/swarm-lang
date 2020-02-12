@@ -39,14 +39,23 @@ public class bool
 func _cast_to_bool(x)
 {
     var b = x.__bool__();
-    if (!isinstanceof(b, bool))
-    {
+
+    !<<
+    if _, ok := l_b.(*sw_cls_@<<:bool>>); !ok {
+    !>>
         throw(TypeError("‘__bool__’方法返回的对象不是bool类型"));
+    !<<
     }
-    if (!(b is true || b is false))
-    {
+    !>>
+
+    !<<
+    if l_b != sw_gv_@<<:_bool_obj_true>> && l_b != sw_gv_@<<:_bool_obj_false>> {
+    !>>
         abort("bool对象失去了唯一性");
+    !<<
     }
+    !>>
+
     return b;
 }
 
