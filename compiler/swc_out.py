@@ -101,7 +101,7 @@ class _Code:
             t, fom = pos_info
             if fom is None:
                 fom = "<module>"
-            tb_info = t.src_file, t.line_no, str(fom)
+            tb_info = t.src_fn, t.line_idx + 1, str(fom)
         _tb_map[(self.file_path_name, len(self.line_list) + 1 + adjust)] = tb_info
 
 def _init_all_method_sign_set():
@@ -206,10 +206,32 @@ def _output_booter():
                       _gen_mod_elem_name(swc_mod.main_mod.get_main_func())))
 
 def _output_native_code(code, nc, fom):
-    "todo"
+    class FakeToken:
+        def __init__(self, line_idx):
+            self.src_fn     = nc.t.src_fn
+            self.line_idx   = nc.t.line_idx + 1 + line_idx + 1
+
+    with code.new_native_code():
+        for line_idx, line in enumerate(native_code.line_list):
+            s = ""
+            for i in line:
+                if isinstance(i, str):
+                    s += i
+                else:
+                    assert isinstance(i, tuple)
+                    mod_name, name = i
+                    s += "%s_%d_%s" % (_gen_mod_name(swc_mod.mod_map[mod_name]), len(name), name)
+            code.record_tb_info((FakeToken(line_idx), fom))
+            code += s
 
 def _output_var_def_assign(code, var_def, expr, is_gv = False):
     "todo"
+    '''
+    for gv in module.global_var_map.itervalues():
+        if gv.expr is not None:
+            code.record_tb_info(gv.expr.pos_info)
+            code += "%s = %s" % (_gen_gv_name(gv), _gen_expr_code(gv.expr))
+    '''
 
 def _output_stmt_list(code, stmt_list):
     "todo"
@@ -320,12 +342,6 @@ def _output_mod(mod):
                 code += "%s = true" % mod_inited_flag_name
                 for dep_mod_name in mod.dep_mod_set:
                     code += "%s()" % _gen_init_mod_func_name(swc_mod.mod_map[dep_mod_name])
-                '''
-                for gv in module.global_var_map.itervalues():
-                    if gv.expr is not None:
-                        code.record_tb_info(gv.expr.pos_info)
-                        code += "%s = %s" % (_gen_gv_name(gv), _gen_expr_code(gv.expr))
-                '''
                 for gv_init in mod.gv_init_list:
                     _output_var_def_assign(gv_init.var_def, gv_init.expr, is_gv = True)
 
