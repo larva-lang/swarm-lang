@@ -402,7 +402,7 @@ def _output_native_code(code, nc, fom):
     class FakeToken:
         def __init__(self, line_idx):
             self.src_fn     = nc.t.src_fn
-            self.line_idx   = nc.t.line_idx + 1 + line_idx + 1
+            self.line_idx   = nc.t.line_idx + 1 + line_idx
 
     with code.new_native_code():
         for line_idx, line in enumerate(nc.line_list):
