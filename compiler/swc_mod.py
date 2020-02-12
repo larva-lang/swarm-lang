@@ -586,7 +586,7 @@ class _FuncObj:
     __repr__ = __str__ = lambda self: "func_obj[%s:%s:%s:%s]" % (self.mod, os.path.base_name(self.func_token.src_fn),
                                                                  self.func_token.line_idx + 1, self.func_token.pos + 1)
 
-func_objs = []
+func_obj_arg_count_set = set(xrange(0, 5))  #0到4个参数是默认有的，可用于Native代码直接使用，其他的在编译期间添加
 
 def parse_func_obj(func_token, token_list, mod, cls, var_map_stk):
     assert func_token.is_reserved("func")
@@ -603,6 +603,6 @@ def parse_func_obj(func_token, token_list, mod, cls, var_map_stk):
     func_obj.stmt_list = swc_stmt.Parser(token_list, mod, cls, func_obj).parse(var_map_stk + (arg_map.copy(),), 0)
     token_list.pop_sym("}")
 
-    func_objs.append(func_obj)
+    func_obj_arg_count_set.add(len(arg_map))
 
     return func_obj

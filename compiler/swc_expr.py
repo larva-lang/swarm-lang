@@ -330,16 +330,21 @@ class Parser:
                         #方法调用
                         self.token_list.pop_sym("(")
                         el = self._parse_expr_list(var_map_stk, ")")
+                        arg_count = len(el)
                         if obj_expr.op == "this":
-                            method = self.cls.method_map.get((name, len(el)))
+                            method = self.cls.method_map.get((name, arg_count))
                             if method is None:
-                                t.syntax_err("类‘%s’没有方法‘%s<%d>’" % (self.cls, name, len(el)))
+                                t.syntax_err("类‘%s’没有方法‘%s<%d>’" % (self.cls, name, arg_count))
                             parse_stk._push_expr(_Expr("call_this.method", (name, el)))
                         else:
-                            if (name != "call" and (name, len(el)) not in swc_mod.all_usr_method_sign_set and
-                                (name, len(el)) not in swc_mod.internal_method_sign_set):
-                                #尽量检测一下，做不到完全
-                                t.syntax_err("程序中没有签名为‘%s<%d>’的方法" % (name, len(el)))
+                            if name == "call":
+                                #对名为call的方法特殊处理，加入函数对象的参数数量集合
+                                swc_mod.func_obj_arg_count_set.add(arg_count)
+                            else:
+                                ms = (name, arg_count)
+                                if ms not in swc_mod.all_usr_method_sign_set and ms not in swc_mod.internal_method_sign_set:
+                                    #尽量检测一下，可能漏报错误，但保证了目标代码不会编译失败
+                                    t.syntax_err("程序中没有签名为‘%s<%d>’的方法" % (name, arg_count))
                             parse_stk._push_expr(_Expr("call_method", (obj_expr, name, el)))
                     else:
                         #属性访问

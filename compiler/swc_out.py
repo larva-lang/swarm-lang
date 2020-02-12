@@ -119,7 +119,7 @@ def _init_all_method_sign_set():
         _all_method_sign_set.add((name, arg_count))
 
     #函数对象的call方法
-    for func_obj in swc_mod.func_objs:
+    for fo_arg_count in swc_mod.func_obj_arg_count_set:
         _all_method_sign_set.add(("call", len(func_obj.arg_map)))
 
 #gens-------------------------------------------------------------
@@ -439,7 +439,7 @@ def _output_util():
                 code += "%s(%s) sw_obj" % (_gen_method_name(name, arg_count), ", ".join(["int64"] + ["sw_obj"] * arg_count))
 
         #所有函数对象类型的实现，就是针对所有出现的函数对象的参数数量，生成对应的匿名class实现
-        for arg_count in set([len(func_obj.arg_map) for func_obj in swc_mod.func_objs]):
+        for arg_count in swc_mod.func_obj_arg_count_set:
             fo_name = "func<%d>" % arg_count
             fo_stru_name = _gen_func_obj_stru_name(arg_count)
             with code.new_blk("type %s struct" % fo_stru_name):
