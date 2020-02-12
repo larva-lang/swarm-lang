@@ -156,7 +156,7 @@ class _Array
             count       := l_other.(*sw_cls_@<<:int>>).v
             if count < 0 || (count > 0 && this_len * count / count != this_len) {
             !>>
-                throw(ValueError("‘%T*count’运算参数错误，count=%d，字符串长度=%d".(this, other, this.len())));
+                throw(ValueError("‘%T*count’运算参数错误，count=%d，容器大小=%d".(this, other, this.size())));
             !<<
             }
             new_s := make([]sw_obj, 0, this_len * count)

@@ -15,7 +15,7 @@ class Record
 }
 
 final var (IDENT_0, IDENT_1, IDENT_2, IDENT_3, IDENT_4, IDENT_5) = (0, 1, 2, 3, 4, 5);
-final var LOOPS = 50000000;
+final var LOOPS = 50000;
 
 var (int_glob, bool_glob, char_1_glob, char_2_glob) = (0, false, 0, 0);
 var array_1_glob = [0] * 51;
