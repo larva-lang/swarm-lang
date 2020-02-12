@@ -10,8 +10,41 @@ builtins_mod = None
 main_mod = None
 mod_map = swc_util.OrderedDict()
 
-all_attr_name_set   = swc_util.OrderedSet() #用于存储所有定义的属性名字
-all_method_sign_set = swc_util.OrderedSet() #用于存储所有定义的方法的签名，元素为(方法名, 参数数量)
+def _make_internal_method_sign_set():
+    s = swc_util.OrderedSet()
+
+    def add_internal_method_sign(simple_name, arg_count):
+        s.add(("__%s__" % simple_name, arg_count))
+
+    #默认构造方法
+    add_internal_method_sign("init", 0)
+    #字符串表示相关
+    add_internal_method_sign("repr", 0)
+    add_internal_method_sign("str", 0)
+    #布尔值
+    add_internal_method_sign("bool", 0)
+    #包含元素相关
+    add_internal_method_sign("getelem", 1)
+    add_internal_method_sign("setelem", 2)
+    add_internal_method_sign("getslice", 2)
+    add_internal_method_sign("setslice", 3)
+    #比较方法
+    for name in "cmp", "eq":
+        for prefix in "", "r_":
+            add_internal_method_sign(prefix + name, 1)
+    #双目数值运算
+    for name in "add", "sub", "mul", "div", "mod", "shl", "shr", "and", "or", "xor":
+        for prefix in "", "i_", "r_":
+            add_internal_method_sign(prefix + name, 1)
+    #单目数值运算
+    for name in "inv", "pos", "neg":
+        add_internal_method_sign(name, 0)
+
+    return s
+
+all_attr_name_set           = swc_util.OrderedSet()             #用于存储所有定义的属性名字
+all_usr_method_sign_set     = swc_util.OrderedSet()             #用于存储所有定义的方法的签名，元素为(方法名, 参数数量)
+internal_method_sign_set    = _make_internal_method_sign_set()  #用于存储所有内部方法的签名
 
 def _parse_decr_set(token_list):
     decr_set = set()
@@ -158,7 +191,7 @@ class _Method:
         self.block_token_list   = block_token_list
         self.stmt_list          = None
 
-        all_method_sign_set.add((self.name, len(self.arg_map)))
+        all_usr_method_sign_set.add((self.name, len(self.arg_map)))
 
     __repr__ = __str__ = lambda self : "%s.%s" % (self.cls, self.name)
 

@@ -111,35 +111,11 @@ def _init_all_method_sign_set():
     _all_method_sign_set = swc_util.OrderedSet()
 
     #内部方法
-
-    def add_internal_method_sign(simple_name, arg_count):
-        _all_method_sign_set.add(("__%s__" % simple_name, arg_count))
-    #默认构造方法
-    add_internal_method_sign("init", 0)
-    #字符串表示相关
-    add_internal_method_sign("repr", 0)
-    add_internal_method_sign("str", 0)
-    #布尔值
-    add_internal_method_sign("bool", 0)
-    #包含元素相关
-    add_internal_method_sign("getelem", 1)
-    add_internal_method_sign("setelem", 2)
-    add_internal_method_sign("getslice", 2)
-    add_internal_method_sign("setslice", 3)
-    #比较方法
-    for name in "cmp", "eq":
-        for prefix in "", "r_":
-            add_internal_method_sign(prefix + name, 1)
-    #双目数值运算
-    for name in "add", "sub", "mul", "div", "mod", "shl", "shr", "and", "or", "xor":
-        for prefix in "", "i_", "r_":
-            add_internal_method_sign(prefix + name, 1)
-    #单目数值运算
-    for name in "inv", "pos", "neg":
-        add_internal_method_sign(name, 0)
+    for name, arg_count in swc_mod.internal_method_sign_set:
+        _all_method_sign_set.add((name, arg_count))
 
     #用户定义方法
-    for name, arg_count in swc_mod.all_method_sign_set:
+    for name, arg_count in swc_mod.all_usr_method_sign_set:
         _all_method_sign_set.add((name, arg_count))
 
     #函数对象的call方法

@@ -336,7 +336,8 @@ class Parser:
                                 t.syntax_err("类‘%s’没有方法‘%s<%d>’" % (self.cls, name, len(el)))
                             parse_stk._push_expr(_Expr("call_this.method", (name, el)))
                         else:
-                            if name != "call" and (name, len(el)) not in swc_mod.all_method_sign_set:
+                            if (name != "call" and (name, len(el)) not in swc_mod.all_usr_method_sign_set and
+                                (name, len(el)) not in swc_mod.internal_method_sign_set):
                                 #尽量检测一下，做不到完全
                                 t.syntax_err("程序中没有签名为‘%s<%d>’的方法" % (name, len(el)))
                             parse_stk._push_expr(_Expr("call_method", (obj_expr, name, el)))

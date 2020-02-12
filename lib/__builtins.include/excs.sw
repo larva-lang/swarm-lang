@@ -42,7 +42,7 @@ public class NoPerm
 
     public func __str__()
     {
-        return info;
+        return this.info;
     }
 }
 
@@ -64,7 +64,7 @@ public class NoAttr
 
     public func __str__()
     {
-        return info;
+        return this.info;
     }
 }
 
@@ -86,7 +86,7 @@ public class NoMethod
 
     public func __str__()
     {
-        return info;
+        return this.info;
     }
 }
 
