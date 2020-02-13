@@ -11,4 +11,16 @@ func sw_obj_to_go_str(obj sw_obj) string {
     return sw_new_obj_sw_cls_@<<:str>>_1(obj).v
 }
 
+func sw_obj_to_go_bool(obj sw_obj) bool {
+    return sw_func_@<<:_cast_to_bool>>_1(obj).(*sw_cls_@<<:bool>>).v
+}
+
+func sw_obj_cmp(a, b sw_obj) int64 {
+    return sw_func_@<<:cmp>>_2(a, b).(*sw_cls_@<<:int>>).v
+}
+
+func sw_obj_eq(a, b sw_obj) bool {
+    return sw_func_@<<:eq>>_2(a, b).(*sw_cls_@<<:bool>>).v
+}
+
 !>>

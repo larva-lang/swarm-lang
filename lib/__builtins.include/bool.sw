@@ -43,4 +43,12 @@ func init() {
     sw_gv_@<<:_bool_obj_false>> = &sw_cls_@<<:bool>>{v: false}
 }
 
+func sw_bool_from_go_bool(b bool) sw_obj {
+    if b {
+        return sw_gv_@<<:_bool_obj_true>>
+    } else {
+        return sw_gv_@<<:_bool_obj_false>>
+    }
+}
+
 !>>

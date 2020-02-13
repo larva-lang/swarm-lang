@@ -122,6 +122,15 @@ def _init_all_method_sign_set():
     for fo_arg_count in swc_mod.func_obj_arg_count_set:
         _all_method_sign_set.add(("call", fo_arg_count))
 
+def _get_builtins_cls(name):
+    return swc_mod.builtins_mod.cls_map[name]
+
+def _get_builtins_func(name, arg_count):
+    return swc_mod.builtins_mod.func_map[(name, arg_count)]
+
+def _get_builtins_gv(name):
+    return swc_mod.builtins_mod.gv_map[name]
+
 #gens-------------------------------------------------------------
 
 def _gen_mod_name(mod):
@@ -169,7 +178,7 @@ def _gen_nil_literal():
     return "sw_util_nil_obj"
 
 def _gen_bool_literal(b):
-    return _gen_mod_elem_name(swc_mod.builtins_mod.gv_map["_bool_obj_%s" % ("true" if b else "false")])
+    return _gen_mod_elem_name(_get_builtins_gv("_bool_obj_%s" % ("true" if b else "false")))
 
 def _gen_new_obj_func_name(cls, arg_count):
     return "sw_new_obj_%s_%d" % (_gen_mod_elem_name(cls), arg_count)
@@ -181,7 +190,7 @@ def _gen_throw_no_perm_exc(info):
     return _gen_throw_exc("sw_exc_make_no_perm_exc(`%s`)" % info)
 
 def _gen_throw_exc(exc):
-    return "%s(%s)" % (_gen_mod_elem_name(swc_mod.builtins_mod.func_map[("throw", 1)]), exc)
+    return "%s(%s)" % (_gen_mod_elem_name(_get_builtins_func("throw", 1)), exc)
 
 def _gen_tmp_var_name():
     return "sw_tmp_var_%d" % swc_util.new_id()
@@ -190,6 +199,8 @@ def _gen_fo_name(fo):
     return "sw_fo_%d" % fo.id
 
 #gens end-------------------------------------------------------------
+
+_curr_mod = None
 
 _UNARY_OP_2_INTERNAL_METHOD = {
     "~":    "inv",
@@ -211,7 +222,16 @@ _BINOCULAR_OP_2_INTERNAL_METHOD = {
     "^":    "xor",
 }
 
+def _gen_el_code(el, with_perm = False):
+    mod = _curr_mod
+
+    ecl = ["%d" % mod.id] if with_perm else []
+    ecl += ["(%s)" % _gen_expr_code(e) for e in el]
+    return ", ".join(ecl)
+
 def _gen_expr_code(expr):
+    mod = _curr_mod
+
     if expr.op == "literal":
         t = expr.arg
         return "%s" % _gen_literal_name(t)
@@ -221,7 +241,7 @@ def _gen_expr_code(expr):
         fmt_code = _gen_str_literal(fmt)
         for e in el:
             assert e.op == "to_go_fmt_str"
-        return "sw_util_sprintf(%s, %s)" % (fmt_code, ", ".join(["(%s)" % _gen_expr_code(e) for e in el])) if el else fmt_code
+        return "sw_util_sprintf(%s, %s)" % (fmt_code, _gen_el_code(el)) if el else fmt_code
 
     if expr.op == "isinstanceof":
         e, cls = expr.arg
@@ -236,97 +256,104 @@ def _gen_expr_code(expr):
         return "sw_util_to_go_fmt_str(`%%%s`, (%s))" % (verb, _gen_expr_code(e))
 
     if expr.op == "cast_to_bool":
-        todo
-        return
+        cls, (e,) = expr.arg
+        assert cls is _get_builtins_cls("bool")
+        return "%s(%s)" % (_gen_mod_elem_name(_get_builtins_func("_cast_to_bool", 1)), _gen_expr_code(e))
 
     if expr.op == "new_obj":
-        todo
-        return
+        cls, el = expr.arg
+        assert cls.is_cls
+        return "%s(%s)" % (_gen_new_obj_func_name(cls, len(el)), _gen_el_code(el))
 
     if expr.op == "this":
-        todo
-        return
+        return "this"
 
     if expr.op == "this.attr":
-        todo
-        return
+        name = expr.arg
+        return "this.m_%s" % name
 
     if expr.op == "call_this.method":
-        todo
-        return
+        name, el = expr.arg
+        return "this.%s(%s)" % (_gen_method_name(name), _gen_el_code(el, with_perm = True))
 
     if expr.op == ".":
-        todo
-        return
+        e, name = expr.arg
+        return "(%s).%s(%d)" % (_gen_expr_code(e), _gen_get_attr_method_name(name), mod.id)
 
     if expr.op == "call_method":
-        todo
-        return
+        e, name, el = expr.arg
+        return "(%s).%s(%s)" % (_gen_expr_code(e), _gen_method_name(name), _gen_el_code(el, with_perm = True))
 
     if expr.op == "call_func":
-        todo
-        return
+        func, el = expr.arg
+        assert func.is_func
+        return "%s(%s)" % (_gen_mod_elem_name(func), _gen_el_code(el))
 
     if expr.op == "gv":
-        todo
-        return
+        gv = expr.arg
+        return _gen_mod_elem_name(gv)
 
     if expr.op == "lv":
-        todo
-        return
+        name = expr.arg
+        return "l_%s" % name
 
-    if expr.op == "tuple":
-        todo
-        return
-
-    if expr.op == "list":
-        todo
-        return
+    if expr.op in ("tuple", "list"):
+        cls = _get_builtins_cls(expr.op)
+        el = expr.arg
+        return "&%s{v: []sw_obj{%s}}" % (_gen_mod_elem_name(cls), _gen_el_code(el))
 
     if expr.op == "dict":
-        todo
-        return
+        kvel = expr.arg
+        ecl = ["%s().reserve_space(sw_int_from_go_int(%d))" % (_gen_new_obj_func_name(_get_builtins_cls("dict"), 0), len(kvel))]
+        for ek, ev in kvel:
+            ecl.append(".%s(%d, (%s), (%s))" % (_gen_method_name("__setelem__"), mod.id, _gen_expr_code(ek), _gen_expr_code(ev)))
+        return "".join(ecl)
 
     if expr.op == "[:]":
-        todo
+        e, begin_e, end_e = lvalue.arg
+        code += ("(%s).%s(%d, (%s), (%s))" %
+                 (_gen_expr_code(e), _gen_method_name("__getslice__"), mod.id, _gen_expr_code(begin_e), _gen_expr_code(end_e)))
         return
 
     if expr.op == "[]":
-        todo
+        e, ke = expr.arg
+        code += "(%s).%s(%d, %s)" % (_gen_expr_code(e), _gen_method_name("__getelem__"), mod.id, _gen_expr_code(ke))
         return
 
     if expr.op == "!":  #bool not特殊处理
-        todo
-        return
+        e = expr.arg
+        return "%s(%s)" % (_gen_mod_elem_name(_get_builtins_func("_cast_to_bool_not", 1)), _gen_expr_code(e))
 
     if expr.op in ("~", "neg", "pos"):
         imn = "inv" if expr.op == "~" else expr.op
-        todo
-        return
+        e = expr.arg
+        return "(%s).%s(%d)" % (_gen_expr_code(e), _gen_method_name("__%s__" % imn), mod.id)
 
     if expr.op == "is": #is是特殊的双目运算
-        todo
-        return
+        ea, eb = expr.arg
+        return "(%s) == (%s)" % (_gen_expr_code(ea), _gen_expr_code(eb))
 
     if expr.op in ("&&", "||"):
-        todo
-        return
+        ea, eb = expr.arg
+        return "sw_bool_from_go_bool(sw_obj_to_go_bool(%s) %s sw_obj_to_go_bool(%s))" % (_gen_expr_code(ea), expr.op, _gen_expr_code(eb))
 
     if expr.op in ("<", ">", "<=", ">="):
-        todo
-        return
+        ea, eb = expr.arg
+        return "sw_bool_from_go_bool(sw_obj_cmp((%s), (%s)) %s 0)" % (_gen_expr_code(ea), _gen_expr_code(eb), expr.op)
 
     if expr.op in ("!=", "=="):
-        todo
-        return
+        ea, eb = expr.arg
+        return "sw_bool_from_go_bool(%ssw_obj_eq((%s), (%s)))" % ("!" if expr.op == "!=" else "", _gen_expr_code(ea), _gen_expr_code(eb))
 
     if expr.op in _BINOCULAR_OP_2_INTERNAL_METHOD:
-        todo
-        return
+        imn = _BINOCULAR_OP_2_INTERNAL_METHOD[expr.op]
+        ea, eb = expr.arg
+        return "(%s).%s(%d, %s)" % (_gen_expr_code(ea), _gen_method_name("__%s__" % imn), mod.id, _gen_expr_code(eb))
 
     if expr.op == "if-else":
-        todo
-        return
+        e_cond, ea, eb = expr.arg
+        return ("func () sw_obj {if sw_obj_to_go_bool(%s) {return (%s)} else {return (%s)}}()" %
+                (_gen_expr_code(e_cond), _gen_expr_code(ea), _gen_expr_code(eb)))
 
     swc_util.abort()
 
@@ -369,7 +396,9 @@ def _output_native_code(code, nc, fom):
             code.record_tb_info((FakeToken(line_idx), fom))
             code += s
 
-def _output_simple_assign(code, mod, lvalue, expr):
+def _output_simple_assign(code, lvalue, expr):
+    mod = _curr_mod
+
     def output_simple_assign_ex(code, lvalue, expr_code):
         code.record_tb_info(expr.pos_info)
 
@@ -411,7 +440,7 @@ def _output_simple_assign(code, mod, lvalue, expr):
         assert sub_lvalue_count > 0
         tmp_var_name = _gen_tmp_var_name()
         code += ("var %s []sw_obj = %s((%s), %d).v" %
-                    (tmp_var_name, _gen_mod_elem_name(swc_mod.builtins_mod.func_map[("_unpack_multi_value", 2)]), expr_code, sub_lvalue_count))
+                    (tmp_var_name, _gen_mod_elem_name(_get_builtins_func("_unpack_multi_value", 2)), expr_code, sub_lvalue_count))
         for i, sub_lvalue in enumerate(sub_lvalues):
             assert sub_lvalue.is_lvalue
             output_simple_assign_ex(code, sub_lvalue, "%s[%d]" % (tmp_var_name, i))
@@ -485,7 +514,9 @@ def _output_method_default(code, cls_stru_name, cls_name, method_name, arg_count
 
 _literal_token_id_set = set()
 
-def _output_mod(mod):
+def _output_mod():
+    mod = _curr_mod
+
     mod_file_name = "%s/%s.mod.%s.M.go" % (_out_prog_dir, _prog_pkg_name, _gen_mod_name(mod))
     with _Code(mod_file_name) as code:
         #全局域的native code
@@ -511,8 +542,7 @@ def _output_mod(mod):
                 v = _gen_str_literal(t.value)
             else:
                 swc_util.abort()
-            code += ("var %s sw_obj = &%s{v: (%s)}" %
-                     (_gen_literal_name(t), _gen_mod_elem_name(swc_mod.builtins_mod.cls_map[literal_type]), v))
+            code += "var %s sw_obj = &%s{v: (%s)}" % (_gen_literal_name(t), _gen_mod_elem_name(_get_builtins_cls(literal_type)), v)
 
         #全局变量定义
         code += ""
@@ -529,7 +559,7 @@ def _output_mod(mod):
                 for dep_mod_name in mod.dep_mod_set:
                     code += "%s()" % _gen_init_mod_func_name(swc_mod.mod_map[dep_mod_name])
                 for gv_init in mod.gv_init_list:
-                    _output_simple_assign(code, mod, gv_init.var_def.to_lvalue(mod), gv_init_list.expr)
+                    _output_simple_assign(code, gv_init.var_def.to_lvalue(mod), gv_init_list.expr)
 
         #函数定义
         for func in mod.func_map.itervalues():
@@ -687,8 +717,11 @@ def output():
 
     _output_main_pkg()
     _output_booter()
-    for mod in swc_mod.mod_map.itervalues():
-        _output_mod(mod)
+
+    global _curr_mod
+    for _curr_mod in swc_mod.mod_map.itervalues():
+        _output_mod()
+
     _output_util()
 
     swc_util.vlog("go代码输出完毕，耗时%.2f秒" % (time.time() - output_start_time))

@@ -84,3 +84,23 @@ func _unpack_multi_value(it, count)
     }
     return vs;
 }
+
+public func cmp(a, b)
+{
+    var result = a.__cmp__(b);
+    if (!isinstanceof(result, int))
+    {
+        throw(TypeError("‘__cmp__’方法返回的对象不是int类型"));
+    }
+    return result;
+}
+
+public func eq(a, b)
+{
+    var result = a.__eq__(b);
+    if (!isinstanceof(result, bool))
+    {
+        throw(TypeError("‘__eq__’方法返回的对象不是bool类型"));
+    }
+    return result;
+}
