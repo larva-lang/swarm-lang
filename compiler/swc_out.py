@@ -234,6 +234,11 @@ def _gen_expr_code(expr):
 
     if expr.op == "literal":
         t = expr.arg
+        if t.is_literal("nil"):
+            return _gen_nil_literal()
+        if t.is_literal("bool"):
+            assert t.value in ("true", "false")
+            return _gen_bool_literal(t.value == "true")
         return "%s" % _gen_literal_name(t)
 
     if expr.op == "str_format":
@@ -597,6 +602,8 @@ def _output_mod():
                     output_attr_perm_checking(code)
                     code += "this.m_%s = v" % attr.name
 
+            init_method_arg_count_set = set([0])    #所有构造方法的参数数量集合，用于生成对应的sw_new_obj_*函数
+
             #用户定义方法
             usr_def_method_sign_set = set()
             for method in cls.method_map.itervalues():
@@ -613,12 +620,18 @@ def _output_mod():
                     code += "return %s" % _gen_nil_literal()
                 if method.name == "__init__":
                     #对于构造方法还要生成对应的sw_new_obj_*函数
-                    sw_new_obj_func_name = _gen_new_obj_func_name(cls, arg_count)
-                    with code.new_blk("func %s(%s) *%s" % (sw_new_obj_func_name, _gen_arg_def(method.arg_map), sw_cls_name)):
-                        code += "o := new(%s)" % sw_cls_name
-                        code.record_tb_info(_POS_INFO_IGNORE)
-                        code += "o.%s(%s)" % (sw_method_name, ", ".join([str(mod.id)] + ["l_%s" % name for name in method.arg_map]))
-                        code += "return o"
+                    init_method_arg_count_set.add(arg_count)
+
+            #生成所有sw_new_obj_*函数
+            for arg_count in init_method_arg_count_set:
+                sw_new_obj_func_name = _gen_new_obj_func_name(cls, arg_count)
+                arg_name_list = [str(i) for i in xrange(arg_count)]
+                with code.new_blk("func %s(%s) *%s" % (sw_new_obj_func_name, _gen_arg_def(arg_name_list), sw_cls_name)):
+                    code += "o := new(%s)" % sw_cls_name
+                    code.record_tb_info(_POS_INFO_IGNORE)
+                    code += "o.%s(%s)" % (_gen_method_name("__init__", arg_count),
+                                          ", ".join([str(mod.id)] + ["l_%s" % name for name in arg_name_list]))
+                    code += "return o"
 
             #补全其他属性的get和set
             for attr_name in [an for an in swc_mod.all_attr_name_set if an not in cls.attr_map]:
