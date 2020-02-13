@@ -5,6 +5,20 @@ public func throw(exc)
     !>>
 }
 
+public func rethrow(exc, tb)
+{
+    if (!isinstanceof(tb, str))
+    {
+        abort("rethrow的tb参数必须是字符串");
+    }
+    !<<
+    panic(&sw_exc_stru_catched{
+        exc:    l_exc,
+        tb:     l_tb.(*sw_cls_@<<:str>>).v,
+    })
+    !>>
+}
+
 public func handle_exc(handler)
 {
     var (exc, tb);
@@ -17,6 +31,20 @@ public func handle_exc(handler)
     !>>
 
     handler.call(exc, tb);
+}
+
+public func call_and_catch(f)
+{
+    var exc, tb;
+    func () {
+        defer handle_exc(func (_exc, _tb) {
+            exc = _exc;
+            tb  = _tb;
+        })
+
+        f.call();
+    }();
+    return (exc, tb);
 }
 
 !<<

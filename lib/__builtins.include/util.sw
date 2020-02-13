@@ -69,7 +69,6 @@ func sw_util_to_go_fmt_str(format string, x sw_obj) string {
 
 !>>
 
-
 func _unpack_multi_value(it, count)
 {
     var vs = [];
