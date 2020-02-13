@@ -22,3 +22,19 @@ func sw_util_obj_addr(x sw_obj) uint64 {
 }
 
 !>>
+
+func _unpack_multi_value(it, count)
+{
+    var vs = [];
+    it = it.iter();
+    while (it.can_get())
+    {
+        if (vs.size() >= count)
+        {
+            throw(ValueError("表达式解包出的值过多，需要%d个".(count)));
+        }
+        vs.append(it.get());
+        it.inc();
+    }
+    return vs;
+}

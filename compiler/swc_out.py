@@ -183,6 +183,9 @@ def _gen_throw_no_perm_exc(info):
 def _gen_throw_exc(exc):
     return "%s(%s)" % (_gen_mod_elem_name(swc_mod.builtins_mod.func_map[("throw", 1)]), exc)
 
+def _gen_tmp_var_name():
+    return "sw_tmp_var_%d" % swc_util.new_id()
+
 #gens end-------------------------------------------------------------
 
 _BOOTER_START_PROG_FUNC_NAME = "Sw_booter_start_prog"
@@ -224,29 +227,50 @@ def _output_native_code(code, nc, fom):
             code.record_tb_info((FakeToken(line_idx), fom))
             code += s
 
-def _output_simple_assign(code, lvalue, expr):
+def _output_simple_assign(code, mod, lvalue, expr):
     def output_simple_assign_ex(code, lvalue, expr_code):
+        code.record_tb_info(expr.pos_info)
+
         if lvalue.op == "gv":
             gv = lvalue.arg
-            assert not gv.is_final
             code += "%s = (%s)" % (_gen_mod_elem_name(gv), expr_code)
 
-        todo
+        elif lvalue.op == "lv":
+            name = lvalue.arg
+            code += "l_%s = (%s)" % (name, expr_code)
+
+        elif lvalue.op == "[]":
+            obj_expr, key_expr = lvalue.arg
+            code += ("(%s).%s(%d, (%s), (%s))" %
+                     (_gen_expr_code(obj_expr), _gen_method_name("__setelem__"), mod.id, _gen_expr_code(key_expr), expr_code))
+
+        elif lvalue.op == "[:]":
+            obj_expr, begin_expr, end_expr = lvalue.arg
+            code += "(%s).%s(%d, (%s), (%s), (%s))" % (_gen_expr_code(obj_expr), _gen_method_name("__setslice__"), mod.id,
+                                                       _gen_expr_code(begin_expr), _gen_expr_code(end_expr), expr_code)
+
+        elif lvalue.op == "this.attr":
+            name = lvalue.arg
+            code += "this.m_%s = (%s)" % (name, expr_code)
+
+        elif lvalue.op == ".":
+            obj_expr, name = lvalue.arg
+            code += "(%s).%s(%d, (%s))" % (_gen_expr_code(obj_expr), _gen_set_attr_method_name(name), mod.id, expr_code)
 
         else:
             assert lvalue.op == "tuple"
-            todo
-        #"gv", "lv", "[]", "[:]", "this.attr", ".") or (op == "tuple"
-        "todo"
+            sub_lvalues = lvalue.arg
+            sub_lvalue_count = len(sub_lvalues)
+            assert sub_lvalue_count > 0
+            tmp_var_name = _gen_tmp_var_name()
+            code += ("var %s []sw_obj = %s((%s), %d).v" %
+                     (tmp_var_name, _gen_mod_elem_name(swc_mod.builtins_mod.func_map[("_unpack_multi_value", 2)]), expr_code, sub_lvalue_count))
+            for i, sub_lvalue in enumerate(sub_lvalues):
+                assert sub_lvalue.is_lvalue
+                output_simple_assign_ex(code, sub_lvalue, "%s[%d]" % (tmp_var_name, i))
 
     assert lvalue.is_lvalue
     output_simple_assign_ex(code, lvalue, _gen_expr_code(expr))
-    '''
-    for gv in module.global_var_map.itervalues():
-        if gv.expr is not None:
-            code.record_tb_info(gv.expr.pos_info)
-            code += "%s = %s" % (_gen_gv_name(gv), _gen_expr_code(gv.expr))
-    '''
 
 def _output_stmt_list(code, stmt_list):
     "todo"
@@ -359,7 +383,7 @@ def _output_mod(mod):
                 for dep_mod_name in mod.dep_mod_set:
                     code += "%s()" % _gen_init_mod_func_name(swc_mod.mod_map[dep_mod_name])
                 for gv_init in mod.gv_init_list:
-                    _output_simple_assign(code, gv_init.var_def.to_lvalue(mod), gv_init_list.expr)
+                    _output_simple_assign(code, mod, gv_init.var_def.to_lvalue(mod), gv_init_list.expr)
 
         #函数定义
         for func in mod.func_map.itervalues():

@@ -140,8 +140,8 @@ class Parser:
             lvalue = expr
             if not lvalue.is_lvalue:
                 expr_token.syntax_err("需要左值")
-            if sym != "=" and lvalue.op == "tuple":
-                expr_token.syntax_err("不能对多左值进行增量赋值")
+            if sym != "=" and lvalue.op in ("[:]", "tuple"):
+                expr_token.syntax_err("不能对切片或多左值进行增量赋值")
             expr = self.expr_parser.parse(var_map_stk)
             self.token_list.pop_sym(";")
             final_gv = lvalue.get_final_gv()

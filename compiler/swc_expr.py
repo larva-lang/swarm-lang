@@ -78,7 +78,7 @@ class _Expr:
         self.op     = op
         self.arg    = arg
 
-        self.is_lvalue = op in ("gv", "lv", "[]", "[:]", "this.attr", ".") or (op == "tuple" and all([elem.is_lvalue for elem in arg]))
+        self.is_lvalue = op in ("gv", "lv", "[]", "[:]", "this.attr", ".") or (op == "tuple" and arg and all([elem.is_lvalue for elem in arg]))
 
         self.pos_info = None #位置信息，只有在解析栈finish时候才会被赋值为解析栈的开始位置，参考相关代码，主要用于output时候的代码位置映射构建
 
@@ -211,17 +211,22 @@ class Parser:
 
             if t.is_sym("("):
                 #子表达式或tuple
-                e = self.parse(var_map_stk)
-                t = self.token_list.pop()
-                if t.is_sym(")"):
-                    #子表达式
-                    parse_stk._push_expr(e)
-                elif t.is_sym(","):
-                    #tuple
-                    el = [e] + self._parse_expr_list(var_map_stk, ")")
-                    parse_stk._push_expr(_Expr("tuple", el))
+                if self.token_list.peek().is_sym(")"):
+                    #空tuple
+                    self.token_list.pop_sym(")")
+                    parse_stk._push_expr(_Expr("tuple", []))
                 else:
-                    t.syntax_err("需要‘,’或‘)’")
+                    e = self.parse(var_map_stk)
+                    t = self.token_list.pop()
+                    if t.is_sym(")"):
+                        #子表达式
+                        parse_stk._push_expr(e)
+                    elif t.is_sym(","):
+                        #tuple
+                        el = [e] + self._parse_expr_list(var_map_stk, ")")
+                        parse_stk._push_expr(_Expr("tuple", el))
+                    else:
+                        t.syntax_err("需要‘,’或‘)’")
 
             elif t.is_sym("["):
                 #list

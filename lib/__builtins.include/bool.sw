@@ -4,13 +4,13 @@ public class bool
     v   bool
     !>>
 
-    //bool的构造需要保证true或false的唯一性，由编译器特殊处理，不能直接实现，编译器对于代码bool(x)会调用到下面的cast_to_bool(x)
+    //bool的构造需要保证true或false的唯一性，由编译器特殊处理，不能直接实现，编译器对于代码bool(x)会调用到下面的_cast_to_bool(x)
     //func __init__(x)
 
     //todo
 }
 
-func cast_to_bool(x)
+func _cast_to_bool(x)
 {
     var b = x.__bool__();
     if (!isinstanceof(b, bool))
