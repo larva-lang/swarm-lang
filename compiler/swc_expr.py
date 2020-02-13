@@ -516,7 +516,7 @@ class Parser:
                     el[ei] = _Expr("to_go_fmt_str", (verb, expr))
                 else:
                     t.syntax_err("非法的格式符：'%s...'" % `t.value[: pos]`[1 : -1])
-                fmt += verb
+                fmt += "%s"
                 ei += 1
             except FmtIdxErr:
                 t.syntax_err("format格式串非正常结束")

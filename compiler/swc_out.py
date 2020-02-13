@@ -186,7 +186,149 @@ def _gen_throw_exc(exc):
 def _gen_tmp_var_name():
     return "sw_tmp_var_%d" % swc_util.new_id()
 
+def _gen_fo_name(fo):
+    return "sw_fo_%d" % fo.id
+
 #gens end-------------------------------------------------------------
+
+_UNARY_OP_2_INTERNAL_METHOD = {
+    "~":    "inv",
+    "neg":  "neg",
+    "pos":  "pos",
+}
+
+"add", "sub", "mul", "div", "shl", "shr", "and", "or", "xor"
+_BINOCULAR_OP_2_INTERNAL_METHOD = {
+    "+":    "add",
+    "-":    "sub",
+    "*":    "mul",
+    "/":    "div",
+    "%":    "mod",
+    "<<":   "shl",
+    ">>":   "shr",
+    "&":    "and",
+    "|":    "or",
+    "^":    "xor",
+}
+
+def _gen_expr_code(expr):
+    if expr.op == "literal":
+        t = expr.arg
+        return "%s" % _gen_literal_name(t)
+
+    if expr.op == "str_format":
+        fmt, el = expr.arg
+        fmt_code = _gen_str_literal(fmt)
+        for e in el:
+            assert e.op == "to_go_fmt_str"
+        return "sw_util_sprintf(%s, %s)" % (fmt_code, ", ".join(["(%s)" % _gen_expr_code(e) for e in el])) if el else fmt_code
+
+    if expr.op == "isinstanceof":
+        e, cls = expr.arg
+        return "(%s).type_name() == (%s)" % (_gen_expr_code(e), _gen_str_literal(str(cls)))
+
+    if expr.op == "func_obj":
+        fo = expr.arg
+        return _gen_fo_name(fo)
+
+    if expr.op == "to_go_fmt_str":
+        verb, e = expr.arg
+        return "sw_util_to_go_fmt_str(`%%%s`, (%s))" % (verb, _gen_expr_code(e))
+
+    if expr.op == "cast_to_bool":
+        todo
+        return
+
+    if expr.op == "new_obj":
+        todo
+        return
+
+    if expr.op == "this":
+        todo
+        return
+
+    if expr.op == "this.attr":
+        todo
+        return
+
+    if expr.op == "call_this.method":
+        todo
+        return
+
+    if expr.op == ".":
+        todo
+        return
+
+    if expr.op == "call_method":
+        todo
+        return
+
+    if expr.op == "call_func":
+        todo
+        return
+
+    if expr.op == "gv":
+        todo
+        return
+
+    if expr.op == "lv":
+        todo
+        return
+
+    if expr.op == "tuple":
+        todo
+        return
+
+    if expr.op == "list":
+        todo
+        return
+
+    if expr.op == "dict":
+        todo
+        return
+
+    if expr.op == "[:]":
+        todo
+        return
+
+    if expr.op == "[]":
+        todo
+        return
+
+    if expr.op == "!":  #bool not特殊处理
+        todo
+        return
+
+    if expr.op in ("~", "neg", "pos"):
+        imn = "inv" if expr.op == "~" else expr.op
+        todo
+        return
+
+    if expr.op == "is": #is是特殊的双目运算
+        todo
+        return
+
+    if expr.op in ("&&", "||"):
+        todo
+        return
+
+    if expr.op in ("<", ">", "<=", ">="):
+        todo
+        return
+
+    if expr.op in ("!=", "=="):
+        todo
+        return
+
+    if expr.op in _BINOCULAR_OP_2_INTERNAL_METHOD:
+        todo
+        return
+
+    if expr.op == "if-else":
+        todo
+        return
+
+    swc_util.abort()
 
 _BOOTER_START_PROG_FUNC_NAME = "Sw_booter_start_prog"
 
@@ -234,40 +376,45 @@ def _output_simple_assign(code, mod, lvalue, expr):
         if lvalue.op == "gv":
             gv = lvalue.arg
             code += "%s = (%s)" % (_gen_mod_elem_name(gv), expr_code)
+            return
 
-        elif lvalue.op == "lv":
+        if lvalue.op == "lv":
             name = lvalue.arg
             code += "l_%s = (%s)" % (name, expr_code)
+            return
 
-        elif lvalue.op == "[]":
+        if lvalue.op == "[]":
             obj_expr, key_expr = lvalue.arg
             code += ("(%s).%s(%d, (%s), (%s))" %
                      (_gen_expr_code(obj_expr), _gen_method_name("__setelem__"), mod.id, _gen_expr_code(key_expr), expr_code))
+            return
 
-        elif lvalue.op == "[:]":
+        if lvalue.op == "[:]":
             obj_expr, begin_expr, end_expr = lvalue.arg
             code += "(%s).%s(%d, (%s), (%s), (%s))" % (_gen_expr_code(obj_expr), _gen_method_name("__setslice__"), mod.id,
                                                        _gen_expr_code(begin_expr), _gen_expr_code(end_expr), expr_code)
+            return
 
-        elif lvalue.op == "this.attr":
+        if lvalue.op == "this.attr":
             name = lvalue.arg
             code += "this.m_%s = (%s)" % (name, expr_code)
+            return
 
-        elif lvalue.op == ".":
+        if lvalue.op == ".":
             obj_expr, name = lvalue.arg
             code += "(%s).%s(%d, (%s))" % (_gen_expr_code(obj_expr), _gen_set_attr_method_name(name), mod.id, expr_code)
+            return
 
-        else:
-            assert lvalue.op == "tuple"
-            sub_lvalues = lvalue.arg
-            sub_lvalue_count = len(sub_lvalues)
-            assert sub_lvalue_count > 0
-            tmp_var_name = _gen_tmp_var_name()
-            code += ("var %s []sw_obj = %s((%s), %d).v" %
-                     (tmp_var_name, _gen_mod_elem_name(swc_mod.builtins_mod.func_map[("_unpack_multi_value", 2)]), expr_code, sub_lvalue_count))
-            for i, sub_lvalue in enumerate(sub_lvalues):
-                assert sub_lvalue.is_lvalue
-                output_simple_assign_ex(code, sub_lvalue, "%s[%d]" % (tmp_var_name, i))
+        assert lvalue.op == "tuple"
+        sub_lvalues = lvalue.arg
+        sub_lvalue_count = len(sub_lvalues)
+        assert sub_lvalue_count > 0
+        tmp_var_name = _gen_tmp_var_name()
+        code += ("var %s []sw_obj = %s((%s), %d).v" %
+                    (tmp_var_name, _gen_mod_elem_name(swc_mod.builtins_mod.func_map[("_unpack_multi_value", 2)]), expr_code, sub_lvalue_count))
+        for i, sub_lvalue in enumerate(sub_lvalues):
+            assert sub_lvalue.is_lvalue
+            output_simple_assign_ex(code, sub_lvalue, "%s[%d]" % (tmp_var_name, i))
 
     assert lvalue.is_lvalue
     output_simple_assign_ex(code, lvalue, _gen_expr_code(expr))
@@ -277,7 +424,7 @@ def _output_stmt_list(code, stmt_list):
 
 def _output_func_obj_def(code, fo):
     arg_count = len(fo.arg_map)
-    with code.new_blk("var sw_fo_%d sw_obj = &%s" % (fo.id, _gen_func_obj_stru_name(arg_count))):
+    with code.new_blk("var %s sw_obj = &%s" % (_gen_fo_name(fo), _gen_func_obj_stru_name(arg_count))):
         with code.new_blk("f: func (%s) sw_obj" % (_gen_arg_def(fo.arg_map)), start_with_blank_line = False, tail = ","):
             _output_stmt_list(code, fo.stmt_list)
             code += "return %s" % _gen_nil_literal()
@@ -295,47 +442,46 @@ def _output_method_default(code, cls_stru_name, cls_name, method_name, arg_count
     arg_name_list = [str(i) for i in xrange(arg_count)]
     with code.new_blk("func (this *%s) %s(%s) sw_obj" %
                       (cls_stru_name, _gen_method_name(method_name, arg_count), _gen_arg_def(arg_name_list, need_perm_arg = True))):
-        def output_method_not_impl(code):
-            if method_name.startswith("__") and method_name.endswith("__"):
-                info = "没有实现内部方法"
-            else:
-                info = "没有方法"
-            exc_code = "sw_exc_make_no_method_exc(`‘%s’%s‘%s<%d>’`)" % (cls_name, info, method_name, arg_count)
-            code += _gen_throw_exc(exc_code)
-            code += 'panic("bug")'  #规避编译错误
-
         if len(method_name) > 4 and method_name.startswith("__") and method_name.endswith("__"):
             simple_method_name = method_name[2 : -2]
 
             if (simple_method_name, arg_count) == ("init", 0):
                 #默认的构造方法，空函数
                 code += "return %s" % _gen_nil_literal()
+                return
 
-            elif (simple_method_name, arg_count) == ("repr", 0):
+            if (simple_method_name, arg_count) == ("repr", 0):
                 #默认的repr，简单输出类型和地址说明
                 code += "return sw_str_from_go_str(sw_util_sprintf(`<%s object at 0x%X>`, this.type_name(), this.addr()))"
+                return
 
-            elif (simple_method_name, arg_count) == ("str", 0):
+            if (simple_method_name, arg_count) == ("str", 0):
                 #默认的str调用repr
                 code += "return this.%s(perm)" % _gen_method_name("__repr__", 0)
+                return
 
-            elif (simple_method_name, arg_count) == ("bool", 0):
+            if (simple_method_name, arg_count) == ("bool", 0):
                 #默认的bool为true
                 code += "return %s" % _gen_bool_literal(True)
+                return
 
-            elif simple_method_name in ("cmp", "eq", "add", "sub", "mul", "div", "mod", "shl", "shr", "and", "or", "xor") and arg_count == 1:
+            if simple_method_name in ("cmp", "eq", "add", "sub", "mul", "div", "mod", "shl", "shr", "and", "or", "xor") and arg_count == 1:
                 #默认的双目运算是调用反向操作
                 code += "return l_0.%s(perm, this)" % _gen_method_name("__r_%s__" % simple_method_name, 1)
+                return
 
-            elif simple_method_name.startswith("i_") and arg_count == 1:
+            if simple_method_name.startswith("i_") and arg_count == 1:
                 #默认的增量运算是调用普通双目运算
                 code += "return this.%s(perm, l_0)" % _gen_method_name("__%s__" % simple_method_name[2 :], 1)
+                return
 
-            else:
-                output_method_not_impl(code)
-
+        if method_name.startswith("__") and method_name.endswith("__"):
+            info = "没有实现内部方法"
         else:
-            output_method_not_impl(code)
+            info = "没有方法"
+        exc_code = "sw_exc_make_no_method_exc(`‘%s’%s‘%s<%d>’`)" % (cls_name, info, method_name, arg_count)
+        code += _gen_throw_exc(exc_code)
+        code += 'panic("bug")'  #规避编译错误
 
 _literal_token_id_set = set()
 

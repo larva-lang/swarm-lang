@@ -28,3 +28,13 @@ func sw_str_from_go_str(s string) *sw_cls_@<<:str>> {
 }
 
 !>>
+
+public func repr(x)
+{
+    var s = x.__repr__();
+    if (!isinstanceof(s, str))
+    {
+        throw(TypeError("‘__repr__’方法返回的对象不是字符串"));
+    }
+    return s;
+}

@@ -17,11 +17,17 @@ func _cast_to_bool(x)
     {
         throw(TypeError("‘__bool__’方法返回的对象不是bool对象"));
     }
-    if (!(b is _bool_obj_true || b is _bool_obj_false))
+    if (!(b is true || b is false))
     {
         abort("bool对象失去了唯一性");
     }
     return b;
+}
+
+//用于‘!’运算
+func _cast_to_bool_not(x)
+{
+    return false if x else true;
 }
 
 final var (_bool_obj_true, _bool_obj_false);
