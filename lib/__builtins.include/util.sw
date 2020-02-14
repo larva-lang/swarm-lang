@@ -38,17 +38,12 @@ func sw_util_to_go_fmt_str(format string, x sw_obj) string {
         }
     case *sw_cls_@<<:int>>:
         switch format {
-        case "%b", "%c", "%d", "%o", "%x", "%X":
+        case "%c", "%d":
             if format != "%c" || (o.v >= 0 && o.v <= 0xFF) {
                 return fmt.Sprintf(format, o.v)
             }
-        }
-    case *sw_cls_@<<:uint>>:
-        switch format {
-        case "%b", "%c", "%d", "%o", "%x", "%X":
-            if format != "%c" || (o.v >= 0 && o.v <= 0xFF) {
-                return fmt.Sprintf(format, o.v)
-            }
+        case "%b", "%o", "%x", "%X":
+            return fmt.Sprintf(format, uint64(o.v))
         }
     case *sw_cls_@<<:float>>:
         switch format {

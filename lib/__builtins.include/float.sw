@@ -6,27 +6,6 @@ public class float
 
     public func __init__(x)
     {
-        if (isinstanceof(x, int))
-        {
-            !<<
-            this.v = float64(l_x.(*sw_cls_@<<:int>>).v)
-            !>>
-            return;
-        }
-        if (isinstanceof(x, uint))
-        {
-            !<<
-            this.v = float64(l_x.(*sw_cls_@<<:uint>>).v)
-            !>>
-            return;
-        }
-        if (isinstanceof(x, float))
-        {
-            !<<
-            this.v = l_x.(*sw_cls_@<<:float>>).v
-            !>>
-            return;
-        }
         if (isinstanceof(x, str))
         {
             !<<
@@ -38,6 +17,22 @@ public class float
             !<<
             }
             this.v = v
+            !>>
+            return;
+        }
+
+        if (isinstanceof(x, float))
+        {
+            !<<
+            this.v = l_x.(*sw_cls_@<<:float>>).v
+            !>>
+            return;
+        }
+
+        if (isinstanceof(x, int))
+        {
+            !<<
+            this.v = float64(l_x.(*sw_cls_@<<:int>>).v)
             !>>
             return;
         }
@@ -59,10 +54,10 @@ public class float
     {
         !<<
         if v, ok := sw_obj_number_to_go_float(l_other); ok {
-            return sw_obj_bool_from_go_bool(this.v < v);
+            return sw_obj_bool_from_go_bool(this.v < v)
         }
         !>>
-        throw_unsupported_binocular_oper("比较", this, other);
+        throw_unsupported_binocular_oper("<", this, other);
     }
 
     public func __eq__(other)
@@ -75,7 +70,63 @@ public class float
         throw_unsupported_binocular_oper("==", this, other);
     }
 
-    //todo
+    func _arithmetic_binocular_oper(op, other)
+    {
+        !<<
+        if v, ok := sw_obj_number_to_go_float(l_other); ok {
+            var result float64
+            switch l_op.(*sw_cls_@<<:str>>).v {
+            case "+":
+                result = this.v + v
+            case "-":
+                result = this.v - v
+            case "*":
+                result = this.v * v
+            case "/":
+                result = this.v / v
+            case "%":
+                result = math.Mod(this.v, v)
+            default:
+                panic("bug")
+            }
+            return sw_obj_float_from_go_float(result)
+        }
+        !>>
+        throw_unsupported_binocular_oper(op, this, other);
+    }
+
+    public func __add__(other)
+    {
+        return this._arithmetic_binocular_oper("+", other);
+    }
+    public func __sub__(other)
+    {
+        return this._arithmetic_binocular_oper("-", other);
+    }
+    public func __mul__(other)
+    {
+        return this._arithmetic_binocular_oper("*", other);
+    }
+    public func __div__(other)
+    {
+        return this._arithmetic_binocular_oper("/", other);
+    }
+    public func __mod__(other)
+    {
+        return this._arithmetic_binocular_oper("%", other);
+    }
+
+    public func __pos__()
+    {
+        return this;
+    }
+
+    public func __neg__()
+    {
+        !<<
+        return sw_obj_float_from_go_float(-this.v)
+        !>>
+    }
 }
 
 !<<
@@ -89,8 +140,6 @@ func sw_obj_float_from_go_float(f float64) *sw_cls_@<<:float>> {
 func sw_obj_number_to_go_float(x sw_obj) (v float64, ok bool) {
     switch o := x.(type) {
     case *sw_cls_@<<:int>>:
-        return float64(o.v), true
-    case *sw_cls_@<<:uint>>:
         return float64(o.v), true
     case *sw_cls_@<<:float>>:
         return o.v, true

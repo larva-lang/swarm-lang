@@ -69,7 +69,7 @@ class _Token:
             def __nonzero__(self):
                 return self.token.type.startswith("literal_")
             def __call__(self, type):
-                assert type in ("nil", "bool", "int", "uint", "float", "str")
+                assert type in ("nil", "bool", "int", "float", "str")
                 return self and self.token.type == "literal_" + type
         self.is_literal = IsLiteral(self)
 
@@ -316,19 +316,32 @@ class Parser:
             if i is not None:
                 #整数
                 try:
-                    if i[-1] in ("u", "U"):
-                        value = int(i[: -1], 0)
+                    if i[0] == "0":
+                        if i[: 2] in ("0x", "0X"):
+                            base = 16
+                            prefix_len = 2
+                        elif i[: 2] in ("0o", "0O"):
+                            base = 8
+                            prefix_len = 2
+                        elif i[: 2] in ("0b", "0B"):
+                            base = 2
+                            prefix_len = 2
+                        else:
+                            base = 8
+                            prefix_len = 1
+                        value = int(i[prefix_len :], base)
+                        #非十进制的int字面量可表示uint64范围，但最终输出的值还是负数
                         if value >= 2 ** 64:
-                            _syntax_err(self, "过大的uint字面量‘%s’" % i)
-                        type = "uint"
-                    else:
-                        value = int(i, 0)
+                            _syntax_err(self, "过大的%d进制int字面量‘%s’" % (base, i))
                         if value >= 2 ** 63:
-                            _syntax_err(self, "过大的int字面量‘%s’" % i)
-                        type = "int"
+                            value -= 2 ** 64
+                    else:
+                        value = int(i, 10)
+                        if value >= 2 ** 63:
+                            _syntax_err(self, "过大的10进制int字面量‘%s’" % i)
                 except ValueError:
                     _syntax_err(self, "非法的整数字面量‘%s’" % i)
-                return _Token("literal_" + type, value, self.src_fn, self.line_idx, token_pos)
+                return _Token("literal_int", value, self.src_fn, self.line_idx, token_pos)
 
             if w is not None:
                 if w in ("true", "false"):

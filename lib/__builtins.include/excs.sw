@@ -36,6 +36,22 @@ public class ValueError
     }
 }
 
+public class DivByZeroError
+{
+    public func __str__()
+    {
+        return "被零除";
+    }
+}
+
+public class ShiftByNegError
+{
+    public func __str__()
+    {
+        return "移位数量为负";
+    }
+}
+
 public class NoPerm
 {
     var info;

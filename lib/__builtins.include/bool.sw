@@ -23,7 +23,7 @@ public class bool
         {
             return !this && other;
         }
-        throw_unsupported_binocular_oper("比较", this, other);
+        throw_unsupported_binocular_oper("<", this, other);
     }
 
     public func __eq__(other)

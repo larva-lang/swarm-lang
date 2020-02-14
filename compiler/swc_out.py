@@ -538,7 +538,7 @@ def _output_mod():
             if literal_type in ("nil", "bool"):
                 #这两个类型的字面量是全局唯一的，直接体现在目标代码中
                 continue
-            if literal_type in ("int", "uint"):
+            if literal_type == "int":
                 v = str(t.value)
             elif literal_type == "float":
                 v = t.value.hex()
