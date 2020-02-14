@@ -21,10 +21,15 @@ public class str
 
 !<<
 
-func sw_str_from_go_str(s string) *sw_cls_@<<:str>> {
+func sw_obj_str_from_go_str(s string) *sw_cls_@<<:str>> {
     return &sw_cls_@<<:str>>{
         v:  s,
     }
+}
+
+func sw_obj_to_go_str(obj sw_obj) string {
+    //直接构造str对象并返回其内部value
+    return sw_new_obj_sw_cls_@<<:str>>_1(obj).v
 }
 
 !>>

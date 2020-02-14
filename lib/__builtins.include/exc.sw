@@ -27,7 +27,7 @@ public func handle_exc(handler)
     c := sw_exc_recovered_to_catched(recover())
 
     l_exc   = c.exc
-    l_tb    = sw_str_from_go_str(c.tb)
+    l_tb    = sw_obj_str_from_go_str(c.tb)
     !>>
 
     handler.call(exc, tb);

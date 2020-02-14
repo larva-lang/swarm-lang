@@ -9,7 +9,7 @@ public class list
     public func size()
     {
         !<<
-        return sw_int_from_go_int(int64(len(this.v)))
+        return sw_obj_int_from_go_int(int64(len(this.v)))
         !>>
     }
 

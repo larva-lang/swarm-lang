@@ -250,7 +250,7 @@ def _gen_expr_code(expr):
 
     if expr.op == "isinstanceof":
         e, cls = expr.arg
-        return "(%s).type_name() == (%s)" % (_gen_expr_code(e), _gen_str_literal(str(cls)))
+        return "sw_obj_bool_from_go_bool(func () bool {_, ok := (%s).(*%s); return ok}())" % (_gen_expr_code(e), _gen_mod_elem_name(cls))
 
     if expr.op == "func_obj":
         fo = expr.arg
@@ -309,7 +309,7 @@ def _gen_expr_code(expr):
 
     if expr.op == "dict":
         kvel = expr.arg
-        ecl = ["%s().reserve_space(sw_int_from_go_int(%d))" % (_gen_new_obj_func_name(_get_builtins_cls("dict"), 0), len(kvel))]
+        ecl = ["%s().reserve_space(sw_obj_int_from_go_int(%d))" % (_gen_new_obj_func_name(_get_builtins_cls("dict"), 0), len(kvel))]
         for ek, ev in kvel:
             ecl.append(".%s(%d, (%s), (%s))" % (_gen_method_name("__setelem__"), mod.id, _gen_expr_code(ek), _gen_expr_code(ev)))
         return "".join(ecl)
@@ -340,15 +340,15 @@ def _gen_expr_code(expr):
 
     if expr.op in ("&&", "||"):
         ea, eb = expr.arg
-        return "sw_bool_from_go_bool(sw_obj_to_go_bool(%s) %s sw_obj_to_go_bool(%s))" % (_gen_expr_code(ea), expr.op, _gen_expr_code(eb))
+        return "sw_obj_bool_from_go_bool(sw_obj_to_go_bool(%s) %s sw_obj_to_go_bool(%s))" % (_gen_expr_code(ea), expr.op, _gen_expr_code(eb))
 
     if expr.op in ("<", ">", "<=", ">="):
         ea, eb = expr.arg
-        return "sw_bool_from_go_bool(sw_obj_cmp((%s), (%s)) %s 0)" % (_gen_expr_code(ea), _gen_expr_code(eb), expr.op)
+        return "sw_obj_bool_from_go_bool(sw_obj_cmp((%s), (%s)) %s 0)" % (_gen_expr_code(ea), _gen_expr_code(eb), expr.op)
 
     if expr.op in ("!=", "=="):
         ea, eb = expr.arg
-        return "sw_bool_from_go_bool(%ssw_obj_eq((%s), (%s)))" % ("!" if expr.op == "!=" else "", _gen_expr_code(ea), _gen_expr_code(eb))
+        return "sw_obj_bool_from_go_bool(%ssw_obj_eq((%s), (%s)))" % ("!" if expr.op == "!=" else "", _gen_expr_code(ea), _gen_expr_code(eb))
 
     if expr.op in _BINOCULAR_OP_2_INTERNAL_METHOD:
         imn = _BINOCULAR_OP_2_INTERNAL_METHOD[expr.op]
@@ -444,7 +444,7 @@ def _output_simple_assign(code, lvalue, expr):
         sub_lvalue_count = len(sub_lvalues)
         assert sub_lvalue_count > 0
         tmp_var_name = _gen_tmp_var_name()
-        code += ("var %s []sw_obj = %s((%s), sw_int_from_go_int(%d)).(*%s).v" %
+        code += ("var %s []sw_obj = %s((%s), sw_obj_int_from_go_int(%d)).(*%s).v" %
                  (tmp_var_name, _gen_mod_elem_name(_get_builtins_func("_unpack_multi_value", 2)), expr_code, sub_lvalue_count,
                   _gen_mod_elem_name(_get_builtins_cls("list"))))
         for i, sub_lvalue in enumerate(sub_lvalues):
@@ -487,7 +487,7 @@ def _output_method_default(code, cls_stru_name, cls_name, method_name, arg_count
 
             if (simple_method_name, arg_count) == ("repr", 0):
                 #默认的repr，简单输出类型和地址说明
-                code += "return sw_str_from_go_str(sw_util_sprintf(`<%s object at 0x%X>`, this.type_name(), this.addr()))"
+                code += "return sw_obj_str_from_go_str(sw_util_sprintf(`<%s object at 0x%X>`, this.type_name(), this.addr()))"
                 return
 
             if (simple_method_name, arg_count) == ("str", 0):
@@ -498,11 +498,6 @@ def _output_method_default(code, cls_stru_name, cls_name, method_name, arg_count
             if (simple_method_name, arg_count) == ("bool", 0):
                 #默认的bool为true
                 code += "return %s" % _gen_bool_literal(True)
-                return
-
-            if simple_method_name in ("cmp", "eq", "add", "sub", "mul", "div", "mod", "shl", "shr", "and", "or", "xor") and arg_count == 1:
-                #默认的双目运算是调用反向操作
-                code += "return l_0.%s(perm, this)" % _gen_method_name("__r_%s__" % simple_method_name, 1)
                 return
 
             if simple_method_name.startswith("i_") and arg_count == 1:

@@ -9,7 +9,7 @@ public class int
 
 !<<
 
-func sw_int_from_go_int(i int64) *sw_cls_@<<:int>> {
+func sw_obj_int_from_go_int(i int64) *sw_cls_@<<:int>> {
     return &sw_cls_@<<:int>>{
         v:  i,
     }

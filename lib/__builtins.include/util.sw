@@ -63,7 +63,7 @@ func sw_util_to_go_fmt_str(format string, x sw_obj) string {
     }
 
     err_info := fmt.Sprintf("格式‘%s’不能匹配类型‘%s’或对应的值", format, x.type_name())
-    sw_func_@<<:throw>>_1(sw_new_obj_sw_cls_@<<:ValueError>>_1(sw_str_from_go_str(err_info)))
+    sw_func_@<<:throw>>_1(sw_new_obj_sw_cls_@<<:ValueError>>_1(sw_obj_str_from_go_str(err_info)))
     panic("bug")
 }
 
@@ -77,30 +77,14 @@ func _unpack_multi_value(it, count)
     {
         if (vs.size() >= count)
         {
-            throw(ValueError("表达式解包出的值过多，需要%d个".(count)));
+            throw(ValueError("表达式解包解出的值过多，需要%d个".(count)));
         }
         vs.append(it.get());
         it.inc();
     }
+    if (vs.size() < count)
+    {
+        throw(ValueError("表达式解包解出的值过少，需要%d个，解出%d个".(count, vs.size())));
+    }
     return vs;
-}
-
-public func cmp(a, b)
-{
-    var result = a.__cmp__(b);
-    if (!isinstanceof(result, int))
-    {
-        throw(TypeError("‘__cmp__’方法返回的对象不是int类型"));
-    }
-    return result;
-}
-
-public func eq(a, b)
-{
-    var result = a.__eq__(b);
-    if (!isinstanceof(result, bool))
-    {
-        throw(TypeError("‘__eq__’方法返回的对象不是bool类型"));
-    }
-    return result;
 }

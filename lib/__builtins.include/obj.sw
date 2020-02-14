@@ -5,16 +5,6 @@ sw_obj是一个所有对象的句柄类型，是一个interface，包含了程�
 */
 //type sw_obj interface {...}
 
-//sw_obj转为go的字符串
-func sw_obj_to_go_str(obj sw_obj) string {
-    //直接构造str对象并返回其内部value
-    return sw_new_obj_sw_cls_@<<:str>>_1(obj).v
-}
-
-func sw_obj_to_go_bool(obj sw_obj) bool {
-    return sw_func_@<<:_cast_to_bool>>_1(obj).(*sw_cls_@<<:bool>>).v
-}
-
 func sw_obj_cmp(a, b sw_obj) int64 {
     return sw_func_@<<:cmp>>_2(a, b).(*sw_cls_@<<:int>>).v
 }
@@ -24,3 +14,23 @@ func sw_obj_eq(a, b sw_obj) bool {
 }
 
 !>>
+
+public func cmp(a, b)
+{
+    var result = a.__cmp__(b);
+    if (!isinstanceof(result, int))
+    {
+        throw(TypeError("‘__cmp__’方法返回的对象不是int类型"));
+    }
+    return result;
+}
+
+public func eq(a, b)
+{
+    var result = a.__eq__(b);
+    if (!isinstanceof(result, bool))
+    {
+        throw(TypeError("‘__eq__’方法返回的对象不是bool类型"));
+    }
+    return result;
+}

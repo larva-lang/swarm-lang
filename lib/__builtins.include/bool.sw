@@ -7,7 +7,41 @@ public class bool
     //bool的构造需要保证true或false的唯一性，由编译器特殊处理，不能直接实现，编译器对于代码bool(x)会调用到下面的_cast_to_bool(x)
     //func __init__(x)
 
-    //todo
+    public func __repr__()
+    {
+        return "true" if (this) else "false";
+    }
+
+    public func __bool__()
+    {
+        return this;
+    }
+
+    public func __cmp__(other)
+    {
+        if (isinstanceof(other, bool))
+        {
+            if (!this && other)
+            {
+                return -1;
+            }
+            if (this && !other)
+            {
+                return 1;
+            }
+            return 0;
+        }
+        throw_unsupported_binocular_oper("比较", this, other);
+    }
+
+    public func __eq__(other)
+    {
+        if (isinstanceof(other, bool))
+        {
+            return (this && other) || (!this && !other);
+        }
+        throw_unsupported_binocular_oper("==", this, other);
+    }
 }
 
 func _cast_to_bool(x)
@@ -43,12 +77,16 @@ func init() {
     sw_gv_@<<:_bool_obj_false>> = &sw_cls_@<<:bool>>{v: false}
 }
 
-func sw_bool_from_go_bool(b bool) sw_obj {
+func sw_obj_bool_from_go_bool(b bool) sw_obj {
     if b {
         return sw_gv_@<<:_bool_obj_true>>
     } else {
         return sw_gv_@<<:_bool_obj_false>>
     }
+}
+
+func sw_obj_to_go_bool(obj sw_obj) bool {
+    return sw_func_@<<:_cast_to_bool>>_1(obj).(*sw_cls_@<<:bool>>).v
 }
 
 !>>
