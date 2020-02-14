@@ -55,17 +55,11 @@ public class float
         return this != 0.0;
     }
 
-    public func __cmp__(other)
+    public func __lt__(other)
     {
         !<<
         if v, ok := sw_obj_number_to_go_float(l_other); ok {
-            if this.v < v {
-                return sw_obj_int_from_go_int(-1)
-            }
-            if this.v > v {
-                return sw_obj_int_from_go_int(1)
-            }
-            return sw_obj_int_from_go_int(0)
+            return sw_obj_bool_from_go_bool(this.v < v);
         }
         !>>
         throw_unsupported_binocular_oper("比较", this, other);

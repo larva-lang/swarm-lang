@@ -29,7 +29,7 @@ def _make_internal_method_sign_set():
     add_internal_method_sign("getslice", 2)
     add_internal_method_sign("setslice", 3)
     #比较方法
-    add_internal_method_sign("cmp", 1)
+    add_internal_method_sign("lt", 1)
     add_internal_method_sign("eq", 1)
     #双目数值运算
     for name in "add", "sub", "mul", "div", "mod", "shl", "shr", "and", "or", "xor":

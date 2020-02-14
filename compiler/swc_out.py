@@ -344,7 +344,10 @@ def _gen_expr_code(expr):
 
     if expr.op in ("<", ">", "<=", ">="):
         ea, eb = expr.arg
-        return "sw_obj_bool_from_go_bool(sw_obj_cmp((%s), (%s)) %s 0)" % (_gen_expr_code(ea), _gen_expr_code(eb), expr.op)
+        if expr.op in (">", "<="):
+            ea, eb = eb, ea
+        need_bool_not = expr.op.endswith("=")
+        return "sw_obj_bool_from_go_bool(%ssw_obj_lt((%s), (%s)))" % ("!" if need_bool_not else "", _gen_expr_code(ea), _gen_expr_code(eb))
 
     if expr.op in ("!=", "=="):
         ea, eb = expr.arg

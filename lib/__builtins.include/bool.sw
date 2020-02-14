@@ -17,19 +17,11 @@ public class bool
         return this;
     }
 
-    public func __cmp__(other)
+    public func __lt__(other)
     {
         if (isinstanceof(other, bool))
         {
-            if (!this && other)
-            {
-                return -1;
-            }
-            if (this && !other)
-            {
-                return 1;
-            }
-            return 0;
+            return !this && other;
         }
         throw_unsupported_binocular_oper("比较", this, other);
     }
