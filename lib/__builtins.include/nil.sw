@@ -1,6 +1,19 @@
 public class NilType
 {
-    //todo
+    public func __repr__()
+    {
+        return "nil";
+    }
+
+    public func __bool__()
+    {
+        return false;
+    }
+
+    public func __eq__(other)
+    {
+        return other is nil;
+    }
 }
 
 !<<

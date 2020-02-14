@@ -68,14 +68,13 @@ func _unpack_multi_value(it, count)
 {
     var vs = [];
     it = it.iter();
-    while (it.can_get())
+    while (it)
     {
         if (vs.size() >= count)
         {
             throw(ValueError("表达式解包解出的值过多，需要%d个".(count)));
         }
-        vs.append(it.get());
-        it.inc();
+        vs.append(it.next());
     }
     if (vs.size() < count)
     {

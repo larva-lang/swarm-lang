@@ -37,7 +37,7 @@ public class int
             return;
         }
 
-        throw(ValueError("不支持类型‘%T’到int的转换".(x)));
+        throw(TypeError("不支持类型‘%T’到int的转换".(x)));
     }
 
     public func __init__(x, base)
@@ -58,7 +58,7 @@ public class int
             return;
         }
 
-        throw(ValueError("int(x, base)的参数类型需要是‘str’和‘int’"));
+        throw(TypeError("int(x, base)的参数类型需要是‘str’和‘int’"));
     }
 
     public func __repr__()

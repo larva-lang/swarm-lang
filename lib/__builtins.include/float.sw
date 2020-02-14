@@ -37,7 +37,7 @@ public class float
             return;
         }
 
-        throw(ValueError("不支持类型‘%T’到float的转换".(x)));
+        throw(TypeError("不支持类型‘%T’到float的转换".(x)));
     }
 
     public func __repr__()

@@ -6,7 +6,7 @@ public class TypeError
     {
         if (!isinstanceof(s, str))
         {
-            throw(ValueError("需要字符串"));
+            throw(TypeError("TypeError(x)的参数需要是字符串"));
         }
         this.s = s;
     }
@@ -25,7 +25,7 @@ public class ValueError
     {
         if (!isinstanceof(s, str))
         {
-            throw(ValueError("需要字符串"));
+            throw(TypeError("ValueError(x)的参数需要是字符串"));
         }
         this.s = s;
     }
@@ -38,6 +38,10 @@ public class ValueError
 
 public class DivByZeroError
 {
+    public func __init__()
+    {
+    }
+
     public func __str__()
     {
         return "被零除";
@@ -46,10 +50,36 @@ public class DivByZeroError
 
 public class ShiftByNegError
 {
+    public func __init__()
+    {
+    }
+
     public func __str__()
     {
         return "移位数量为负";
     }
+}
+
+public class IndexError
+{
+    var idx, sz;
+
+    public func __str__()
+    {
+        return "索引%d在范围[0, %d)之外".(this.idx, this.sz);
+    }
+}
+
+public func throw_index_error(idx, sz)
+{
+    if (!(isinstanceof(idx, int) && isinstanceof(sz, int)))
+    {
+        throw(TypeError("throw_index_error(idx, sz)的参数需要是两个int"));
+    }
+    exc = IndexError();
+    exc.idx = idx;
+    exc.sz  = sz;
+    return exc;
 }
 
 public class NoPerm

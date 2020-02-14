@@ -8,23 +8,20 @@ public class range
         this.end    = end;
     }
 
+    public func __bool__()
+    {
+        return this.curr < this.end;
+    }
+
     public func iter()
     {
         return this;
     }
 
-    public func get()
+    public func next()
     {
-        return this.curr;
-    }
-
-    public func can_get()
-    {
-        return this.curr < this.end;
-    }
-
-    public func inc()
-    {
+        ret = this.curr;
         this.curr += 1;
+        return ret;
     }
 }

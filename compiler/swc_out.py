@@ -316,8 +316,9 @@ def _gen_expr_code(expr):
 
     if expr.op == "[:]":
         e, begin_e, end_e = lvalue.arg
-        code += ("(%s).%s(%d, (%s), (%s))" %
-                 (_gen_expr_code(e), _gen_method_name("__getslice__"), mod.id, _gen_expr_code(begin_e), _gen_expr_code(end_e)))
+        begin_ecode = _gen_nil_literal() if begin_e is None else _gen_expr_code(begin_e)
+        end_ecode   = _gen_nil_literal() if end_e is None else _gen_expr_code(end_e)
+        code += "(%s).%s(%d, (%s), (%s))" % (_gen_expr_code(e), _gen_method_name("__getslice__"), mod.id, begin_ecode, end_ecode)
         return
 
     if expr.op == "[]":
@@ -427,9 +428,11 @@ def _output_simple_assign(code, lvalue, expr):
             return
 
         if lvalue.op == "[:]":
-            obj_expr, begin_expr, end_expr = lvalue.arg
-            code += "(%s).%s(%d, (%s), (%s), (%s))" % (_gen_expr_code(obj_expr), _gen_method_name("__setslice__"), mod.id,
-                                                       _gen_expr_code(begin_expr), _gen_expr_code(end_expr), expr_code)
+            obj_expr, begin_e, end_e = lvalue.arg
+            begin_ecode = _gen_nil_literal() if begin_e is None else _gen_expr_code(begin_e)
+            end_ecode   = _gen_nil_literal() if end_e is None else _gen_expr_code(end_e)
+            code += ("(%s).%s(%d, (%s), (%s), (%s))" %
+                     (_gen_expr_code(obj_expr), _gen_method_name("__setslice__"), mod.id, begin_ecode, end_ecode, expr_code))
             return
 
         if lvalue.op == "this.attr":
