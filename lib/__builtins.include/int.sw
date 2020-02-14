@@ -13,7 +13,7 @@ public class int
             v, err := strconv.ParseInt(s, 0, 64)
             if err != nil {
             !>>
-                throw(ValueError("字符串‘%s’不能转为int对象".(x)));
+                throw(ValueError("无效的int的字符串表示：‘%s’".(x)));
             !<<
             }
             this.v = v
@@ -44,13 +44,17 @@ public class int
     {
         if (isinstanceof(x, str) && isinstanceof(base, int))
         {
+            if (base < 0 || base == 1 || base > 36)
+            {
+                throw(ValueError("不支持%d进制".(base)));
+            }
             !<<
             s := l_x.(*sw_cls_@<<:str>>).v
             b := l_base.(*sw_cls_@<<:int>>).v
             v, err := strconv.ParseInt(s, int(b), 64)
             if err != nil {
             !>>
-                throw(ValueError("字符串‘%s’不能按%d进制转为int对象".(x, base)));
+                throw(ValueError("无效的%sint的字符串表示：‘%s’".("" if base == 0 else "%d进制".(base), x)));
             !<<
             }
             this.v = v
@@ -71,49 +75,61 @@ public class int
         return this != 0;
     }
 
-    public func __lt__(other)
+    func _cmp_oper(op, other)
     {
         if (isinstanceof(other, int))
         {
             !<<
-            return sw_obj_bool_from_go_bool(this.v < l_other.(*sw_cls_@<<:int>>).v)
+            v := l_other.(*sw_cls_@<<:int>>).v
+            bool result;
+            switch l_op.(*sw_cls_@<<:str>>).v {
+            case "<":
+                result = this.v < v
+            case "==":
+                result = this.v == v
+            default:
+                panic("bug")
+            }
+            return sw_obj_bool_from_go_bool(result)
             !>>
         }
 
         if (isinstanceof(other, float))
         {
-            return float(this) < other;
+            var f = float(this);
+            if (op == "<")
+            {
+                return f < other;
+            }
+            if (op == "==")
+            {
+                return f == other;
+            }
+            abort("bug");
         }
 
-        throw_unsupported_binocular_oper("<", this, other);
+        throw_unsupported_binocular_oper(op, this, other);
+    }
+
+    public func __lt__(other)
+    {
+        return this._cmp_oper("<", other);
     }
 
     public func __eq__(other)
     {
-        if (isinstanceof(other, int))
-        {
-            !<<
-            return sw_obj_bool_from_go_bool(this.v == l_other.(*sw_cls_@<<:int>>).v)
-            !>>
-        }
-
-        if (isinstanceof(other, float))
-        {
-            return float(this) == other;
-        }
-
-        throw_unsupported_binocular_oper("==", this, other);
+        return this._cmp_oper("==", other);
     }
 
     func _arithmetic_binocular_oper(op, other)
     {
         if (isinstanceof(other, int))
         {
-            if ("/%".has(op) && other == 0)
+            if ("/、%".has(op) && other == 0)
             {
                 throw(DivByZeroError());
             }
-            if (("<<", ">>").has(op) && other < 0)
+            if ("<<、>>".has(op) && other < 0)
             {
                 throw(ShiftByNegError());
             }
@@ -148,7 +164,7 @@ public class int
             !>>
         }
 
-        if (isinstanceof(other, float) && "+-*/%".has(op))
+        if (isinstanceof(other, float) && "+、-、*、/、%".has(op))
         {
             return float(this)._arithmetic_binocular_oper(op, other);
         }

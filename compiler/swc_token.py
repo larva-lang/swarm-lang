@@ -1,6 +1,6 @@
 #coding=utf8
 
-import re, math
+import re, math, copy
 
 import swc_util
 
@@ -129,6 +129,9 @@ class _TokenList:
     def __iter__(self):
         for i in xrange(self.i, len(self.l)):
             yield self.l[i]
+
+    def copy(self):
+        return copy.deepcopy(self)
 
     def extend(self, other):
         assert self.i == 0 and other.i == 0

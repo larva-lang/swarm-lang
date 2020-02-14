@@ -1,15 +1,7 @@
-public class TypeError
+//只能内部创建的简单异常，用于内部使用以及简单异常的扩展源
+class _Exception
 {
     var s;
-
-    public func __init__(s)
-    {
-        if (!isinstanceof(s, str))
-        {
-            throw(TypeError("TypeError(x)的参数需要是字符串"));
-        }
-        this.s = s;
-    }
 
     public func __str__()
     {
@@ -17,46 +9,61 @@ public class TypeError
     }
 }
 
-public class ValueError
+//公开的简单异常，增加public构造方法
+public class Exception(_Exception)
 {
-    var s;
-
     public func __init__(s)
     {
         if (!isinstanceof(s, str))
         {
-            throw(TypeError("ValueError(x)的参数需要是字符串"));
+            throw(TypeError("%T(x)的参数需要是字符串".(this)));
         }
         this.s = s;
     }
-
-    public func __str__()
-    {
-        return this.s;
-    }
 }
 
-public class DivByZeroError
+public class TypeError(Exception)
+{
+}
+
+public class ValueError(Exception)
+{
+}
+
+//不含数据的空异常类，可被其他类似异常扩展
+public class EmptyException
 {
     public func __init__()
     {
     }
 
+    public func __str__()
+    {
+        return "";
+    }
+}
+
+public class DivByZeroError(EmptyException)
+{
     public func __str__()
     {
         return "被零除";
     }
 }
 
-public class ShiftByNegError
+public class ShiftByNegError(EmptyException)
 {
-    public func __init__()
-    {
-    }
-
     public func __str__()
     {
         return "移位数量为负";
+    }
+}
+
+public class NotImpl(EmptyException)
+{
+    public func __str__()
+    {
+        return "未实现";
     }
 }
 
@@ -64,86 +71,30 @@ public class IndexError
 {
     var idx, sz;
 
+    public func __init__(idx, sz)
+    {
+        if (!(isinstanceof(idx, int) && isinstanceof(sz, int)))
+        {
+            throw(TypeError("IndexError(idx, sz)的参数需要是两个int"));
+        }
+        this.idx    = idx;
+        this.sz     = sz;
+    }
+
     public func __str__()
     {
         return "索引%d在范围[0, %d)之外".(this.idx, this.sz);
     }
 }
 
-public func throw_index_error(idx, sz)
+public class NoPerm(_Exception)
 {
-    if (!(isinstanceof(idx, int) && isinstanceof(sz, int)))
-    {
-        throw(TypeError("throw_index_error(idx, sz)的参数需要是两个int"));
-    }
-    var exc = IndexError();
-    exc.idx = idx;
-    exc.sz  = sz;
-    return exc;
 }
 
-public class NoPerm
+public class NoAttr(_Exception)
 {
-    var info;
-
-    public func __str__()
-    {
-        return this.info;
-    }
 }
 
-!<<
-
-func sw_exc_make_no_perm_exc(info string) sw_obj {
-    return &sw_cls_@<<:NoPerm>>{
-        m_info: &sw_cls_@<<:str>>{
-            v:  info,
-        },
-    }
-}
-
-!>>
-
-public class NoAttr
+public class NoMethod(_Exception)
 {
-    var info;
-
-    public func __str__()
-    {
-        return this.info;
-    }
 }
-
-!<<
-
-func sw_exc_make_no_attr_exc(info string) sw_obj {
-    return &sw_cls_@<<:NoAttr>>{
-        m_info: &sw_cls_@<<:str>>{
-            v:  info,
-        },
-    }
-}
-
-!>>
-
-public class NoMethod
-{
-    var info;
-
-    public func __str__()
-    {
-        return this.info;
-    }
-}
-
-!<<
-
-func sw_exc_make_no_method_exc(info string) sw_obj {
-    return &sw_cls_@<<:NoMethod>>{
-        m_info: &sw_cls_@<<:str>>{
-            v:  info,
-        },
-    }
-}
-
-!>>

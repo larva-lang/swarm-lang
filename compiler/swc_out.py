@@ -186,8 +186,11 @@ def _gen_new_obj_func_name(cls, arg_count):
 def _gen_func_obj_stru_name(arg_count):
     return "sw_fo_stru_%d" % arg_count
 
+def _gen_internal_simple_exc(exc_cls_name, info):
+    return "&%s{m_s: sw_obj_str_from_go_str(%s)}" % (_gen_mod_elem_name(_get_builtins_cls(exc_cls_name)), _gen_str_literal(info))
+
 def _gen_throw_no_perm_exc(info):
-    return _gen_throw_exc("sw_exc_make_no_perm_exc(`%s`)" % info)
+    return _gen_throw_exc(_gen_internal_simple_exc("NoPerm", info))
 
 def _gen_throw_exc(exc):
     return "%s(%s)" % (_gen_mod_elem_name(_get_builtins_func("throw", 1)), exc)
@@ -197,6 +200,14 @@ def _gen_tmp_var_name():
 
 def _gen_fo_name(fo):
     return "sw_fo_%d" % fo.id
+
+def _gen_cls_type_name(cls):
+    name = str(cls)
+    builtins_prefix = "__builtins."
+    if name.startswith(builtins_prefix):
+        name = name[len(builtins_prefix) :]
+    assert name
+    return name
 
 #gens end-------------------------------------------------------------
 
@@ -258,7 +269,7 @@ def _gen_expr_code(expr):
 
     if expr.op == "to_go_fmt_str":
         verb, e = expr.arg
-        return "sw_util_to_go_fmt_str(`%%%s`, (%s))" % (verb, _gen_expr_code(e))
+        return "sw_util_to_go_fmt_str(%s, (%s))" % (_gen_str_literal("%" + verb), _gen_expr_code(e))
 
     if expr.op == "cast_to_bool":
         cls, (e,) = expr.arg
@@ -470,8 +481,8 @@ def _output_func_obj_def(code, fo):
             _output_stmt_list(code, fo.stmt_list)
             code += "return %s" % _gen_nil_literal()
 
-def _output_attr_method_default(code, cls_stru_name, cls_name, attr_name):
-    exc_code = "sw_exc_make_no_attr_exc(`‘%s’没有属性‘%s’`)" % (cls_name, attr_name)
+def _output_attr_method_default(code, cls_stru_name, cls_type_name, attr_name):
+    exc_code = _gen_internal_simple_exc("NoAttr", "‘%s’没有属性‘%s’" % (cls_type_name, attr_name))
     throw_exc_code = _gen_throw_exc(exc_code)
     with code.new_blk("func (this *%s) %s(perm int64) sw_obj" % (cls_stru_name, _gen_get_attr_method_name(attr_name))):
         code += throw_exc_code
@@ -479,7 +490,7 @@ def _output_attr_method_default(code, cls_stru_name, cls_name, attr_name):
     with code.new_blk("func (this *%s) %s(perm int64, v sw_obj)" % (cls_stru_name, _gen_set_attr_method_name(attr_name))):
         code += throw_exc_code
 
-def _output_method_default(code, cls_stru_name, cls_name, method_name, arg_count):
+def _output_method_default(code, cls_stru_name, cls_type_name, method_name, arg_count):
     arg_name_list = [str(i) for i in xrange(arg_count)]
     with code.new_blk("func (this *%s) %s(%s) sw_obj" %
                       (cls_stru_name, _gen_method_name(method_name, arg_count), _gen_arg_def(arg_name_list, need_perm_arg = True))):
@@ -493,7 +504,8 @@ def _output_method_default(code, cls_stru_name, cls_name, method_name, arg_count
 
             if (simple_method_name, arg_count) == ("repr", 0):
                 #默认的repr，简单输出类型和地址说明
-                code += "return sw_obj_str_from_go_str(sw_util_sprintf(`<%s object at 0x%X>`, this.type_name(), this.addr()))"
+                code += ("return sw_obj_str_from_go_str(sw_util_sprintf(%s, this.type_name(), this.addr()))" %
+                         _gen_str_literal("<%s object at 0x%X>"))
                 return
 
             if (simple_method_name, arg_count) == ("str", 0):
@@ -515,7 +527,7 @@ def _output_method_default(code, cls_stru_name, cls_name, method_name, arg_count
             info = "没有实现内部方法"
         else:
             info = "没有方法"
-        exc_code = "sw_exc_make_no_method_exc(`‘%s’%s‘%s<%d>’`)" % (cls_name, info, method_name, arg_count)
+        exc_code = _gen_internal_simple_exc("NoMethod", "‘%s’%s‘%s<%d>’" % (cls_type_name, info, method_name, arg_count))
         code += _gen_throw_exc(exc_code)
         code += 'panic("bug")'  #规避编译错误
 
@@ -586,7 +598,8 @@ def _output_mod():
 
             #内部使用的方法
             with code.new_blk("func (this *%s) type_name() string" % sw_cls_name):
-                code += "return %s" % _gen_str_literal(str(cls))
+                cls_name = _gen_cls_type_name(cls)
+                code += "return %s" % _gen_str_literal(cls_name)
             with code.new_blk("func (this *%s) addr() uint64" % sw_cls_name):
                 code += "return sw_util_obj_addr(this)"
 
@@ -636,11 +649,11 @@ def _output_mod():
 
             #补全其他属性的get和set
             for attr_name in [an for an in swc_mod.all_attr_name_set if an not in cls.attr_map]:
-                _output_attr_method_default(code, sw_cls_name, str(cls), attr_name)
+                _output_attr_method_default(code, sw_cls_name, _gen_cls_type_name(cls), attr_name)
 
             #补全其他方法
             for method_name, arg_count in [ms for ms in _all_method_sign_set if ms not in usr_def_method_sign_set]:
-                _output_method_default(code, sw_cls_name, str(cls), method_name, arg_count)
+                _output_method_default(code, sw_cls_name, _gen_cls_type_name(cls), method_name, arg_count)
 
         #全局域的函数对象
         for fo in mod.gfo_list:

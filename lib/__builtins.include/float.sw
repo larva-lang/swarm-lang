@@ -13,7 +13,7 @@ public class float
             v, err := strconv.ParseFloat(s, 64)
             if err != nil {
             !>>
-                throw(ValueError("字符串‘%s’不能转为float对象".(x)));
+                throw(ValueError("无效的float的字符串表示：‘%s’".(x)));
             !<<
             }
             this.v = v
@@ -50,24 +50,33 @@ public class float
         return this != 0.0;
     }
 
-    public func __lt__(other)
+    func _cmp_oper(op, other)
     {
         !<<
         if v, ok := sw_obj_number_to_go_float(l_other); ok {
-            return sw_obj_bool_from_go_bool(this.v < v)
+            var result bool
+            switch l_op.(*sw_cls_@<<:str>>).v {
+            case "<":
+                result = this.v < v;
+            case "==":
+                result = this.v == v;
+            default:
+                panic("bug")
+            }
+            return sw_obj_bool_from_go_bool(result)
         }
         !>>
-        throw_unsupported_binocular_oper("<", this, other);
+        throw_unsupported_binocular_oper(op, this, other);
+    }
+
+    public func __lt__(other)
+    {
+        return this._cmp_oper("<", other);
     }
 
     public func __eq__(other)
     {
-        !<<
-        if v, ok := sw_obj_number_to_go_float(l_other); ok {
-            return sw_obj_bool_from_go_bool(this.v == v)
-        }
-        !>>
-        throw_unsupported_binocular_oper("==", this, other);
+        return this._cmp_oper("==", other);
     }
 
     func _arithmetic_binocular_oper(op, other)

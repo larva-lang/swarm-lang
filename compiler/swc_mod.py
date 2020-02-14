@@ -201,13 +201,16 @@ class _Method:
         del self.block_token_list
 
 class _Cls(_ModElem):
-    def __init__(self, mod, decr_set, name_token, name):
+    def __init__(self, mod, decr_set, name_token, name, ext_cls_name_list):
         _ModElem.__init__(self)
 
-        self.mod        = mod
-        self.is_public  = "public" in decr_set
-        self.name_token = name_token
-        self.name       = name
+        self.mod                = mod
+        self.is_public          = "public" in decr_set
+        self.name_token         = name_token
+        self.name               = name
+        self.ext_cls_name_list  = ext_cls_name_list
+
+        self.ext_cls_expand_stat = "to_expand"
 
         self.nc_list            = []
         self.attr_map           = swc_util.OrderedDict()
@@ -283,6 +286,56 @@ class _Cls(_ModElem):
             if (name, method_arg_count) in self.method_map:
                 t.syntax_err("方法‘%s<%d>’已存在" % (name, method_arg_count))
 
+    def _expand_ext_cls(self, chain = ""):
+        if self.ext_cls_expand_stat == "expanded":
+            assert self.ext_cls_name_list is None
+            return
+
+        chain += ("->" if chain else "") + str(self)
+
+        if self.ext_cls_expand_stat == "expanding":
+            self.name_token.syntax_err("类的扩展存在环形依赖：[%s]" % chain)
+
+        assert self.ext_cls_expand_stat == "to_expand"
+        self.ext_cls_expand_stat = "expanding"
+
+        ext_attr_map = swc_util.OrderedDict()
+        ext_method_map = swc_util.OrderedDict()
+        for t, cls_name in self.ext_cls_name_list:
+            cls = self.mod.cls_map.get(cls_name)
+            if cls is None:
+                t.syntax_err("找不到类‘%s’，必须为本模块的类" % cls_name)
+            cls._expand_ext_cls(chain)
+            #统计扩展属性，需要严格唯一
+            for attr in cls.attr_map.itervalues():
+                self_attr = self.attr_map.get(attr.name)
+                if self_attr is not None:
+                    self_attr.name_token.syntax_err("属性‘%s’已从‘%s’扩展得到，不能重复定义" % (attr.name, cls))
+                ext_attr = ext_attr_map.get(attr.name)
+                if ext_attr is not None:
+                    self.name_token.syntax_err("属性‘%s’有多个扩展来源：‘%s’、‘%s’等" % (attr.name, ext_attr.cls, cls))
+                ext_attr_map[attr.name] = attr
+            #统计扩展方法，允许当前类重写
+            for (method_name, arg_count), method in cls.method_map.iteritems():
+                if (method_name, arg_count) in self.method_map:
+                    #忽略已重写的
+                    continue
+                ext_method = ext_method_map.get((method_name, arg_count))
+                if ext_method is not None:
+                    self.name_token.syntax_err("方法‘%s<%d>’有多个扩展来源：‘%s’、‘%s’等" % (method_name, arg_count, ext_method.cls, cls))
+                ext_method_map[(method_name, arg_count)] = method
+
+        for ext_attr in ext_attr_map.itervalues():
+            assert ext_attr.name not in self.attr_map
+            self.attr_map[ext_attr.name] = _Attr(self, ext_attr.decr_set, ext_attr.name_token, ext_attr.name)
+        for ext_method in ext_method_map.itervalues():
+            assert ext_method.name not in self.method_map
+            self.method_map[ext_method.name] = _Method(self, ext_method.decr_set, ext_method.name_token, ext_method.name,
+                                                       ext_method.arg_map.copy(), ext_method.block_token_list.copy())
+
+        self.ext_cls_name_list = None
+        self.ext_cls_expand_stat = "expanded"
+
     def _compile(self):
         for method in self.method_map.itervalues():
             method._compile()
@@ -357,6 +410,7 @@ class Mod:
 
         self._precompile()
         self._check_name_conflict()
+        self._expand_ext_cls()
 
     __repr__ = __str__ = lambda self : self.name
 
@@ -446,8 +500,23 @@ class Mod:
     def _parse_cls(self, decr_set, token_list):
         t, name = token_list.pop_name()
         self._check_redefine(t, name)
+        if token_list.peek().is_sym("("):
+            #扩展了其他类
+            token_list.pop_sym("(")
+            ext_cls_name_list = []
+            while True:
+                t, ext_cls_name = token_list.pop_name()
+                ext_cls_name_list.append((t, ext_cls_name))
+                t, sym = token_list.pop_sym()
+                if sym == ")":
+                    break
+                if sym != ",":
+                    t.syntax_err("需要‘,’或‘)’")
+                if token_list.peek().is_sym(")"):
+                    token_list.pop_sym(")")
+                    break
         token_list.pop_sym("{")
-        cls = _Cls(self, decr_set, t, name)
+        cls = _Cls(self, decr_set, t, name, ext_cls_name_list)
         cls._parse(token_list)
         token_list.pop_sym("}")
         self.cls_map[name] = cls
@@ -539,6 +608,10 @@ class Mod:
         for arg_map in arg_maps():
             for name, t in arg_map.iteritems():
                 check_lv_name_conflict(name, t, self)
+
+    def _expand_ext_cls(self):
+        for cls in self.cls_map.itervalues():
+            cls._expand_ext_cls()
 
     def _check_main_func(self):
         assert self is main_mod

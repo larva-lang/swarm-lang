@@ -1,3 +1,30 @@
+func _to_str(method, x)
+{
+    var s;
+    if (method == "str")
+    {
+        s = x.__str__();
+    }
+    else if (method == "repr")
+    {
+        s = x.__repr__();
+    }
+    else
+    {
+        abort("bug");
+    }
+    if (!isinstanceof(s, str))
+    {
+        throw(TypeError("‘__%s__’方法返回的对象不是字符串".(method)));
+    }
+    return s;
+}
+
+public func repr(x)
+{
+    return _to_str("repr", x);
+}
+
 public class str
 {
     !<<
@@ -6,11 +33,7 @@ public class str
 
     public func __init__(x)
     {
-        var s = x.__str__();
-        if (!isinstanceof(s, str))
-        {
-            throw(TypeError("‘__str__’方法返回的对象不是字符串"));
-        }
+        var s = _to_str("str", x);
         !<<
         this.v = l_s.v
         !>>
@@ -43,7 +66,7 @@ public class str
         var real_idx = idx + len if idx < 0 else idx;
         if (real_idx < 0 || real_idx >= len)
         {
-            throw_index_error(idx, len);
+            throw(IndexError(idx, len));
         }
         !<<
         i := l_real_idx.(*sw_cls_@<<:int>>).v
@@ -88,28 +111,36 @@ public class str
         !>>
     }
 
-    public func __lt__(other)
+    func _cmp_oper(op, other)
     {
         if (isinstanceof(other, str))
         {
             !<<
-            return sw_obj_bool_from_go_bool(this.v < l_other.(*sw_cls_@<<:str>>).v)
+            v := l_other.(*sw_cls_@<<:str>>).v
+            bool result;
+            switch l_op.(*sw_cls_@<<:str>>).v {
+            case "<":
+                result = this.v < v
+            case "==":
+                result = this.v == v
+            default:
+                panic("bug")
+            }
+            return sw_obj_bool_from_go_bool(result)
             !>>
         }
 
-        throw_unsupported_binocular_oper("<", this, other);
+        throw_unsupported_binocular_oper(op, this, other);
+    }
+
+    public func __lt__(other)
+    {
+        return this._cmp_oper("<", other);
     }
 
     public func __eq__(other)
     {
-        if (isinstanceof(other, str))
-        {
-            !<<
-            return sw_obj_bool_from_go_bool(this.v == l_other.(*sw_cls_@<<:str>>).v)
-            !>>
-        }
-
-        throw_unsupported_binocular_oper("==", this, other);
+        return this._cmp_oper("==", other);
     }
 
     public func __add__(other)
@@ -186,13 +217,3 @@ func sw_obj_to_go_str(obj sw_obj) string {
 }
 
 !>>
-
-public func repr(x)
-{
-    var s = x.__repr__();
-    if (!isinstanceof(s, str))
-    {
-        throw(TypeError("‘__repr__’方法返回的对象不是字符串"));
-    }
-    return s;
-}

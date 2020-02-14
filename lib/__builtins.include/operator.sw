@@ -4,24 +4,36 @@ public func throw_unsupported_binocular_oper(op, a, b)
     throw(TypeError("不支持类型‘%T’和‘%T’的‘%s’运算".(a, b, op)));
 }
 
-public func less_than(a, b)
+func _cmp_oper(op, a, b)
 {
-    var result = a.__lt__(b);
+    var result;
+    if (op == "lt")
+    {
+        result = a.__lt__(b);
+    }
+    else if (op == "eq")
+    {
+        result = a.__eq__(b);
+    }
+    else
+    {
+        abort("bug");
+    }
     if (!isinstanceof(result, bool))
     {
-        throw(TypeError("‘__lt__’方法返回的对象不是bool类型"));
+        throw(TypeError("‘__%s__’方法返回的对象不是bool类型".(op)));
     }
     return result;
 }
 
+public func less_than(a, b)
+{
+    return _cmp_oper("lt", a, b);
+}
+
 public func equals(a, b)
 {
-    var result = a.__eq__(b);
-    if (!isinstanceof(result, bool))
-    {
-        throw(TypeError("‘__eq__’方法返回的对象不是bool类型"));
-    }
-    return result;
+    return _cmp_oper("eq", a, b);
 }
 
 !<<
