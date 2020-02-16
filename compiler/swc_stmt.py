@@ -16,12 +16,15 @@ class Parser:
         self.fom        = fom
 
         self.expr_parser    = swc_expr.Parser(token_list, mod, cls, fom, self)
-        self.stmt_list      = []
+        self.stmt_list_stk  = []
 
     def parse(self, var_map_stk, loop_deep):
+        stmt_list = []
+        self.stmt_list_stk.append(stmt_list)
         while True:
             if self.token_list.peek().is_sym("}"):
-                return self.stmt_list
+                self.stmt_list_stk.pop()
+                return stmt_list
 
             t = self.token_list.pop()
 
@@ -31,14 +34,14 @@ class Parser:
 
             if t.is_sym("{"):
                 #新代码块
-                self.stmt_list.append(_Stmt("block", stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep)))
+                stmt_list.append(_Stmt("block", stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep)))
                 self.token_list.pop_sym("}")
                 continue
 
             if t.is_reserved and t.value in ("break", "continue"):
                 if loop_deep == 0:
                     t.syntax_err("循环外的%s" % t.value)
-                self.stmt_list.append(_Stmt(t.value))
+                stmt_list.append(_Stmt(t.value))
                 self.token_list.pop_sym(";")
                 continue
 
@@ -47,7 +50,7 @@ class Parser:
                     stmt = _Stmt("return_nil")
                 else:
                     stmt = _Stmt("return", expr = self.expr_parser.parse(var_map_stk))
-                self.stmt_list.append(stmt)
+                stmt_list.append(stmt)
                 self.token_list.pop_sym(";")
                 continue
 
@@ -56,7 +59,7 @@ class Parser:
                 self.token_list.pop_sym("{")
                 for_stmt_list = self.parse(var_map_stk + (for_var_map, swc_util.OrderedDict()), loop_deep + 1)
                 self.token_list.pop_sym("}")
-                self.stmt_list.append(
+                stmt_list.append(
                     _Stmt("for", for_var_map = for_var_map, for_var_def = for_var_def, iter_expr = iter_expr, stmt_list = for_stmt_list))
                 continue
 
@@ -67,7 +70,7 @@ class Parser:
                 self.token_list.pop_sym("{")
                 stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep + 1)
                 self.token_list.pop_sym("}")
-                self.stmt_list.append(_Stmt("while", expr = expr, stmt_list = stmt_list))
+                stmt_list.append(_Stmt("while", expr = expr, stmt_list = stmt_list))
                 continue
 
             if t.is_reserved("if"):
@@ -94,8 +97,8 @@ class Parser:
                     else_stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep)
                     self.token_list.pop_sym("}")
                     break
-                self.stmt_list.append(_Stmt("if", if_expr_list = if_expr_list, if_stmt_list_list = if_stmt_list_list,
-                                            else_stmt_list = else_stmt_list))
+                stmt_list.append(_Stmt("if", if_expr_list = if_expr_list, if_stmt_list_list = if_stmt_list_list,
+                                       else_stmt_list = else_stmt_list))
                 continue
 
             if t.is_reserved("var"):
@@ -109,7 +112,7 @@ class Parser:
                     self.token_list.pop_sym(";")
                 else:
                     t.syntax_err("需要‘;’或‘=’")
-                self.stmt_list.append(_Stmt("var_def", var_def = var_def, init_expr = init_expr))
+                stmt_list.append(_Stmt("var_def", var_def = var_def, init_expr = init_expr))
                 continue
 
             if t.is_reserved("defer"):
@@ -117,11 +120,11 @@ class Parser:
                 if expr.op not in ("call_this.method", "call_method", "call_func"):
                     t.syntax_err("defer表达式必须是一个函数或方法调用")
                 self.token_list.pop_sym(";")
-                self.stmt_list.append(_Stmt("defer", expr = expr))
+                stmt_list.append(_Stmt("defer", expr = expr))
                 continue
 
             if t.is_native_code:
-                self.stmt_list.append(_Stmt("native_code", nc = swc_mod.NativeCode(self.mod, t), fom = self.fom))
+                stmt_list.append(_Stmt("native_code", nc = swc_mod.NativeCode(self.mod, t), fom = self.fom))
                 continue
 
             if t.is_reserved("else"):
@@ -133,7 +136,7 @@ class Parser:
             expr = self.expr_parser.parse(var_map_stk)
             t, sym = self.token_list.pop_sym()
             if sym == ";":
-                self.stmt_list.append(_Stmt("expr", expr = expr))
+                stmt_list.append(_Stmt("expr", expr = expr))
                 continue
             if sym not in swc_token.ASSIGN_SYM_SET:
                 t.syntax_err("需要‘;’或赋值")
@@ -148,10 +151,10 @@ class Parser:
             final_gv = lvalue.get_final_gv()
             if final_gv is not None:
                 expr_token.syntax_err("不能对final修饰的全局变量‘%s’赋值" % final_gv)
-            self.stmt_list.append(_Stmt("assign", lvalue = lvalue, sym = sym, expr = expr))
+            stmt_list.append(_Stmt("assign", lvalue = lvalue, sym = sym, expr = expr))
 
     def def_func_obj(self, func_obj):
-        self.stmt_list.append(_Stmt("def_func_obj", func_obj = func_obj))
+        self.stmt_list_stk[-1].append(_Stmt("def_func_obj", func_obj = func_obj))
 
     def _parse_for_prefix(self, var_map_stk):
         self.token_list.pop_sym("(")
