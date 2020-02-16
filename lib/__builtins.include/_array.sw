@@ -167,6 +167,30 @@ class _Array
     }
 }
 
+//用于tuple和list的迭代器的扩展源
+class _ArrayIter
+{
+    var a, curr_idx;
+
+    func __init__(a)
+    {
+        this.a          = a;
+        this.curr_idx   = 0;
+    }
+
+    public func __bool__()
+    {
+        return this.curr_idx < this.a.size();
+    }
+
+    public func next()
+    {
+        var curr = this.a[this.curr_idx];
+        this.curr_idx += 1;
+        return curr;
+    }
+}
+
 func _make_array_real_idx(type_name, idx, sz)
 {
     if (!isinstanceof(idx, int))

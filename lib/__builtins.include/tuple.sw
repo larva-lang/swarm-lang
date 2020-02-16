@@ -7,6 +7,15 @@ public class tuple(_Array)
         //todo
         throw(NotImpl());
     }
+
+    public func iter()
+    {
+        return tupleiter(this);
+    }
+}
+
+class tupleiter(_ArrayIter)
+{
 }
 
 !<<

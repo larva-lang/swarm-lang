@@ -53,6 +53,15 @@ public class list(_Array)
     {
         return this.pop(-1);
     }
+
+    public func iter()
+    {
+        return listiter(this);
+    }
+}
+
+class listiter(_ArrayIter)
+{
 }
 
 !<<
