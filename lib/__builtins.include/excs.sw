@@ -30,20 +30,15 @@ public class ValueError(Exception)
 {
 }
 
-//不含数据的空异常类，可被其他类似异常扩展
-public class EmptyException
+//用于一些独立信息的异常类的扩展源
+class _EmptyException
 {
     public func __init__()
     {
     }
-
-    public func __str__()
-    {
-        return "";
-    }
 }
 
-public class DivByZeroError(EmptyException)
+public class DivByZeroError(_EmptyException)
 {
     public func __str__()
     {
@@ -51,7 +46,7 @@ public class DivByZeroError(EmptyException)
     }
 }
 
-public class ShiftByNegError(EmptyException)
+public class ShiftByNegError(_EmptyException)
 {
     public func __str__()
     {
@@ -59,7 +54,7 @@ public class ShiftByNegError(EmptyException)
     }
 }
 
-public class NotImpl(EmptyException)
+public class NotImpl(_EmptyException)
 {
     public func __str__()
     {

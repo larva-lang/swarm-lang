@@ -58,16 +58,7 @@ public class str
 
     public func __getelem__(idx)
     {
-        if (!isinstanceof(idx, int))
-        {
-            throw(TypeError("str[x]的下标需要是int类型"));
-        }
-        var len = this.len();
-        var real_idx = idx + len if idx < 0 else idx;
-        if (real_idx < 0 || real_idx >= len)
-        {
-            throw(IndexError(idx, len));
-        }
+        var real_idx = _make_array_real_idx("str", idx, this.len());
         !<<
         i := l_real_idx.(*sw_cls_@<<:int>>).v
         return sw_obj_str_from_go_str(this.v[i : i + 1])
@@ -76,34 +67,7 @@ public class str
 
     public func __getslice__(bi, ei)
     {
-        var len = this.len();
-        if (bi is nil)
-        {
-            bi = 0;
-        }
-        if (ei is nil)
-        {
-            ei = len;
-        }
-
-        if (!(isinstanceof(bi, int) && isinstanceof(ei, int)))
-        {
-            throw(TypeError("str[x:y]的两个下标需要是nil或int对象"));
-        }
-
-        var fix_idx = func (i) {
-            if (i < 0)
-            {
-                i += len;
-            }
-            return min(max(0, i), len);
-        };
-        bi = fix_idx.call(bi);
-        ei = fix_idx.call(ei);
-        if (bi > ei)
-        {
-            ei = bi;
-        }
+        (bi, ei) = _make_array_real_slice_range("str", bi, ei, this.len());
         !<<
         b := l_bi.(*sw_cls_@<<:int>>).v
         e := l_ei.(*sw_cls_@<<:int>>).v
@@ -200,6 +164,12 @@ public class str
         !<<
         }
         !>>
+    }
+
+    public func hash()
+    {
+        //todo
+        throw(NotImpl());
     }
 }
 

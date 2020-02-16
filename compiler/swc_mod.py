@@ -308,6 +308,8 @@ class _Cls(_ModElem):
             if cls is None:
                 t.syntax_err("找不到类‘%s’，必须为本模块的类" % cls_name)
             cls._expand_ext_cls(chain)
+            #直接扩展NativeCode块，正确性由开发者保证
+            self.nc_list += cls.nc_list
             #统计扩展属性，需要严格唯一
             for attr in cls.attr_map.itervalues():
                 self_attr = self.attr_map.get(attr.name)

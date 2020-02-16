@@ -60,17 +60,20 @@ public class dict
     public func __getelem__(k)
     {
         //todo
+        throw(NotImpl());
     }
 
     public func __setelem__(k, v)
     {
         //todo
+        throw(NotImpl());
         return this;
     }
 
     public func reserve_space(sz)
     {
         //todo
+        throw(NotImpl());
         return this;
     }
 
