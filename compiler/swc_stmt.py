@@ -52,11 +52,12 @@ class Parser:
                 continue
 
             if t.is_reserved("for"):
-                for_var_map, iter_expr = self._parse_for_prefix(var_map_stk)
+                for_var_map, for_var_def, iter_expr = self._parse_for_prefix(var_map_stk)
                 self.token_list.pop_sym("{")
                 for_stmt_list = self.parse(var_map_stk + (for_var_map, swc_util.OrderedDict()), loop_deep + 1)
                 self.token_list.pop_sym("}")
-                self.stmt_list.append(_Stmt("for", for_var_map = for_var_map, iter_expr = iter_expr, stmt_list = for_stmt_list))
+                self.stmt_list.append(
+                    _Stmt("for", for_var_map = for_var_map, for_var_def = for_var_def, iter_expr = iter_expr, stmt_list = for_stmt_list))
                 continue
 
             if t.is_reserved("while"):
@@ -163,7 +164,7 @@ class Parser:
         self.token_list.pop_sym(":")
         iter_expr = self.expr_parser.parse(var_map_stk) #iter_expr不能用for_var_map的变量
         self.token_list.pop_sym(")")
-        return for_var_map, iter_expr
+        return for_var_map, var_def, iter_expr
 
     def _add_lv(self, var_def, var_map_stk):
         for t, name in var_def.iter_names():

@@ -415,11 +415,19 @@ def _output_native_code(code, nc, fom):
             code.record_tb_info((FakeToken(line_idx), fom))
             code += s
 
-def _output_simple_assign(code, lvalue, expr):
+def _output_simple_assign(code, lvalue, expr_or_expr_code):
     mod = _curr_mod
 
+    expr = expr_code = None
+    if isinstance(expr_or_expr_code, str):
+        expr_code = expr_or_expr_code
+    else:
+        expr = expr_or_expr_code
+        expr_code = _gen_expr_code(expr)
+
     def output_simple_assign_ex(code, lvalue, expr_code):
-        code.record_tb_info(expr.pos_info)
+        if expr is not None:
+            code.record_tb_info(expr.pos_info)
 
         if lvalue.op == "gv":
             gv = lvalue.arg
@@ -468,7 +476,7 @@ def _output_simple_assign(code, lvalue, expr):
             output_simple_assign_ex(code, sub_lvalue, "%s[%d]" % (tmp_var_name, i))
 
     assert lvalue.is_lvalue
-    output_simple_assign_ex(code, lvalue, _gen_expr_code(expr))
+    output_simple_assign_ex(code, lvalue, expr_code)
 
 def _output_stmt_list(code, stmt_list):
     mod = _curr_mod
@@ -538,11 +546,23 @@ def _output_stmt_list(code, stmt_list):
             continue
 
         if stmt.type == "for":
-            todo
+            with code.new_blk(""):
+                iter_var_name = _gen_tmp_var_name()
+                code.record_tb_info(stmt.iter_expr.pos_info)
+                code += "var %s sw_obj = (%s).iter()" % (iter_var_name, _gen_expr_code(stmt.iter_expr))
+                for name in stmt.for_var_map:
+                    code += "var l_%s sw_obj"
+                code.record_tb_info(stmt.iter_expr.pos_info)
+                with code.new_blk("for sw_obj_to_go_bool(%s)" % iter_var_name, start_with_blank_line = False):
+                    code.record_tb_info(stmt.iter_expr.pos_info)
+                    _output_simple_assign(code, stmt.for_var_def.to_lvalue(), "%s.%s(%d)" % (iter_var_name, _gen_method_name("next"), mod.id))
+                    _output_stmt_list(code, stmt.stmt_list)
             continue
 
         if stmt.type == "while":
-            todo
+            code.record_tb_info(stmt.expr.pos_info, adjust = 1)
+            with code.new_blk("for sw_obj_to_go_bool(%s)" % _gen_expr_code(stmt.expr)):
+                _output_stmt_list(code, stmt.stmt_list)
             continue
 
         if stmt.type in ("break", "continue"):
@@ -550,7 +570,14 @@ def _output_stmt_list(code, stmt_list):
             continue
 
         if stmt.type == "if":
-            todo
+            assert len(stmt.if_expr_list) == len(stmt.if_stmt_list_list)
+            for i, (if_expr, if_stmt_list) in enumerate(zip(stmt.if_expr_list, stmt.if_stmt_list_list)):
+                code.record_tb_info(if_expr.pos_info, adjust = 1 if i == 0 else -1)
+                with code.new_blk("%sif sw_obj_to_go_bool(%s)" % ("" if i == 0 else "else ", _gen_expr_code(if_expr))):
+                    _output_stmt_list(code, if_stmt_list)
+            if stmt.else_stmt_list is not None:
+                with code.new_blk("else"):
+                    _output_stmt_list(code, stmt.else_stmt_list)
             continue
 
         if stmt.type == "return_nil":
