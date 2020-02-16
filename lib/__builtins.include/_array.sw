@@ -76,13 +76,13 @@ class _Array
         if (isinstanceof(this, tuple))
         {
             !<<
-            return sw_obj_tuple_from_go_slice(s)
+            return sw_obj_tuple_from_go_slice(s, true)
             !>>
         }
         else if (isinstanceof(this, list))
         {
             !<<
-            return sw_obj_list_from_go_slice(s)
+            return sw_obj_list_from_go_slice(s, true)
             !>>
         }
         else
@@ -149,8 +149,40 @@ class _Array
 
     public func __mul__(other)
     {
-        //todo
-        throw(NotImpl());
+        if (isinstanceof(other, int))
+        {
+            !<<
+            this_len    := int64(len(this.v))
+            count       := l_other.(*sw_cls_@<<:int>>).v
+            if count < 0 || (count > 0 && this_len * count / count != this_len) {
+            !>>
+                throw(ValueError("‘%T*count’运算参数错误，count=%d，字符串长度=%d".(this, other, this.len())));
+            !<<
+            }
+            new_s := make([]sw_obj, 0, this_len * count)
+            for i := int64(0); i < count; i ++ {
+                new_s = append(new_s, this.v...)
+            }
+            !>>
+            if (isinstanceof(this, tuple))
+            {
+                !<<
+                return sw_obj_tuple_from_go_slice(new_s, false)
+                !>>
+            }
+            else if (isinstanceof(this, list))
+            {
+                !<<
+                return sw_obj_list_from_go_slice(new_s, false)
+                !>>
+            }
+            else
+            {
+                abort("bug");
+            }
+        }
+
+        throw_unsupported_binocular_oper("*", this, other);
     }
 
     public func size()

@@ -66,9 +66,12 @@ class listiter(_ArrayIter)
 
 !<<
 
-func sw_obj_list_from_go_slice(s []sw_obj) *sw_cls_@<<:list>> {
+func sw_obj_list_from_go_slice(s []sw_obj, need_copy bool) *sw_cls_@<<:list>> {
+    if need_copy {
+        s = sw_util_copy_go_slice(s)
+    }
     return &sw_cls_@<<:list>>{
-        v:  sw_util_copy_go_slice(s),
+        v:  s,
     }
 }
 
