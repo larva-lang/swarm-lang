@@ -120,7 +120,7 @@ class Parser:
                 continue
 
             if t.is_native_code:
-                self.stmt_list.append(_Stmt("native_code", native_code = swc_mod.NativeCode(self.mod, t), fom = self.fom))
+                self.stmt_list.append(_Stmt("native_code", nc = swc_mod.NativeCode(self.mod, t), fom = self.fom))
                 continue
 
             if t.is_reserved("else"):

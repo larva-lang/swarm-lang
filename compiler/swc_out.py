@@ -219,7 +219,6 @@ _UNARY_OP_2_INTERNAL_METHOD = {
     "pos":  "pos",
 }
 
-"add", "sub", "mul", "div", "shl", "shr", "and", "or", "xor"
 _BINOCULAR_OP_2_INTERNAL_METHOD = {
     "+":    "add",
     "-":    "sub",
@@ -472,7 +471,98 @@ def _output_simple_assign(code, lvalue, expr):
     output_simple_assign_ex(code, lvalue, _gen_expr_code(expr))
 
 def _output_stmt_list(code, stmt_list):
-    "todo"
+    mod = _curr_mod
+
+    for stmt in stmt_list:
+        if stmt.type == "native_code":
+            _output_native_code(code, stmt.nc, stmt.fom)
+            continue
+
+        if stmt.type == "block":
+            with code.new_blk(""):
+                _output_stmt_list(code, stmt.stmt_list)
+            continue
+
+        if stmt.type == "def_func_obj":
+            _output_func_obj_def(code, stmt.func_obj)
+            continue
+
+        if stmt.type == "var_def":
+            for name in stmt.var_def.iter_names():
+                code += "var l_%s sw_obj"
+            _output_simple_assign(code, stmt.var_def.to_lvalue(), stmt.expr)
+            continue
+
+        if stmt.type == "assign":
+            if stmt.sym == "=":
+                _output_simple_assign(code, stmt.lvalue, stmt.expr)
+            else:
+                assert stmt.lvalue.op not in ("[:]", "tuple") and stmt.sym.endswith("=")
+                aug_op = stmt.sym[: -1]
+                assert aug_op in _BINOCULAR_OP_2_INTERNAL_METHOD
+                imn = _BINOCULAR_OP_2_INTERNAL_METHOD[aug_op]
+                imn_expr_code = "%s(%d, (%s))" % (_gen_method_name("__i_%s__" % imn), mod.id, _gen_expr_code(stmt.expr))
+                code.record_tb_info(stmt.lvalue.pos_info)
+                if stmt.lvalue.op == "[]":
+                    obj_expr, key_expr = stmt.lvalue_code.arg
+                    obj_tmp_var_name = _gen_tmp_var_name()
+                    code += "var %s sw_obj = (%s)" % (obj_tmp_var_name, _gen_expr_code(obj_expr))
+                    key_tmp_var_name = _gen_tmp_var_name()
+                    code.record_tb_info(stmt.lvalue.pos_info)
+                    code += "var %s sw_obj = (%s)" % (key_tmp_var_name, _gen_expr_code(key_expr))
+                    code.record_tb_info(stmt.lvalue.pos_info)
+                    code += ("%s.%s(%d, %s, %s.%s(%d, %s).%s)" %
+                             (obj_tmp_var_name, _gen_method_name("__setelem__"), mod.id, key_tmp_var_name, obj_tmp_var_name,
+                              _gen_method_name("__getelem__"), mod.id, key_tmp_var_name, imn_expr_code))
+                elif stmt.lvalue.op == ".":
+                    obj_expr, name = stmt.lvalue.arg
+                    tmp_var_name = _gen_tmp_var_name()
+                    code += "var %s sw_obj = (%s)" % (tmp_var_name, _gen_expr_code(obj_expr))
+                    code.record_tb_info(stmt.lvalue.pos_info)
+                    code += "%s.%s(%d, %s.%s(%d).%s)" % (tmp_var_name, _gen_set_attr_method_name(name), mod.id, tmp_var_name,
+                                                         _gen_get_attr_method_name(name), mod.id, imn_expr_code)
+                else:
+                    assert stmt.lvalue.op in ("gv", "lv", "this.attr")
+                    lvalue_code = _gen_expr_code(stmt.lvalue)
+                    code += "%s = %s.%s" % (lvalue_code, lvalue_code, imn_expr_code)
+            continue
+
+        if stmt.type == "expr":
+            code.record_tb_info(stmt.expr.pos_info)
+            code += _gen_expr_code(stmt.expr)
+            continue
+
+        if stmt.type == "defer":
+            code.record_tb_info(stmt.expr.pos_info)
+            code += "defer %s" % _gen_expr_code(stmt.expr)
+            continue
+
+        if stmt.type == "for":
+            todo
+            continue
+
+        if stmt.type == "while":
+            todo
+            continue
+
+        if stmt.type in ("break", "continue"):
+            code += stmt.type
+            continue
+
+        if stmt.type == "if":
+            todo
+            continue
+
+        if stmt.type == "return_nil":
+            code += "return (%s)" % _gen_nil_literal()
+            continue
+
+        if stmt.type == "return":
+            code.record_tb_info(stmt.expr.pos_info)
+            code += "return (%s)" % _gen_expr_code(stmt.expr)
+            continue
+
+        swc_util.abort()
 
 def _output_func_obj_def(code, fo):
     arg_count = len(fo.arg_map)
@@ -578,7 +668,7 @@ def _output_mod():
                 for dep_mod_name in mod.dep_mod_set:
                     code += "%s()" % _gen_init_mod_func_name(swc_mod.mod_map[dep_mod_name])
                 for gv_init in mod.gv_init_list:
-                    _output_simple_assign(code, gv_init.var_def.to_lvalue(mod), gv_init.expr)
+                    _output_simple_assign(code, gv_init.var_def.to_lvalue(mod = mod), gv_init.expr)
 
         #函数定义
         for func in mod.func_map.itervalues():
