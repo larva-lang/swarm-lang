@@ -171,6 +171,26 @@ public class str
         //todo
         throw(NotImpl());
     }
+
+    public func join(it)
+    {
+        !<<
+        sl := make([]string, 0, 8)
+        !>>
+        for (var s: it)
+        {
+            if (!isinstanceof(s, str))
+            {
+                throw(TypeError("str.join(iterable)的参数的迭代元素必须是字符串"));
+            }
+            !<<
+            sl = append(sl, l_s.(*sw_cls_@<<:str>>).v)
+            !>>
+        }
+        !<<
+        return sw_obj_str_from_go_str(strings.Join(sl, this.v))
+        !>>
+    }
 }
 
 !<<
