@@ -7,18 +7,20 @@ public func throw_unsupported_binocular_oper(op, a, b)
 func _cmp_oper(op, a, b)
 {
     var result;
-    if (op == "lt")
-    {
+    !<<
+    switch op.(*sw_cls_@<<:str>>).v {
+    case "lt":
+    !>>
         result = a.__lt__(b);
-    }
-    else if (op == "eq")
-    {
+    !<<
+    case "eq":
+    !>>
         result = a.__eq__(b);
+    !<<
+    default:
+        panic("bug")
     }
-    else
-    {
-        abort("bug");
-    }
+    !>>
     if (!isinstanceof(result, bool))
     {
         throw(TypeError("‘__%s__’方法返回的对象不是bool类型".(op)));
