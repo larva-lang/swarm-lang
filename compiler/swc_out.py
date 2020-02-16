@@ -258,6 +258,10 @@ def _gen_expr_code(expr):
             assert e.op == "to_go_fmt_str"
         return "sw_obj_str_from_go_str(sw_util_sprintf(%s, %s))" % (fmt_code, _gen_el_code(el)) if el else fmt_code
 
+    if expr.op == "isinstanceof_this":
+        result = expr.arg
+        return _gen_bool_literal(result)
+
     if expr.op == "isinstanceof":
         e, cls = expr.arg
         return "sw_obj_bool_from_go_bool(func () bool {_, ok := (%s).(*%s); return ok}())" % (_gen_expr_code(e), _gen_mod_elem_name(cls))

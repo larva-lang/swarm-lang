@@ -319,7 +319,12 @@ class Parser:
                     else:
                         t.syntax_err("无效的类‘%s’" % name)
                 self.token_list.pop_sym(")")
-                parse_stk._push_expr(_Expr("isinstanceof", (e, cls)))
+                if e.op == "this":
+                    #对this做判断需要特殊处理下
+                    assert self.cls is not None
+                    parse_stk._push_expr(_Expr("isinstanceof_this", cls is self.cls)
+                else:
+                    parse_stk._push_expr(_Expr("isinstanceof", (e, cls)))
 
             else:
                 t.syntax_err("非法的表达式")
