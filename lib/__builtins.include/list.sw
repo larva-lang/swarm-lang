@@ -6,7 +6,7 @@ public class list(_Array)
     {
         var real_idx = _make_array_real_idx("list", idx, this.size());
         !<<
-        i := l_real_idx.(*sw_cls_@<<:int>>).v
+        i := l_real_idx.(*sw_cls_@<<:_int>>).v
         this.v[i] = l_x
         !>>
     }
@@ -43,7 +43,7 @@ public class list(_Array)
     {
         var real_idx = _make_array_real_idx("list", idx, this.size());
         !<<
-        i := l_real_idx.(*sw_cls_@<<:int>>).v
+        i := l_real_idx.(*sw_cls_@<<:_int>>).v
         this.v = append(this.v[: i], this.v[i + 1 :]...)
         !>>
         return this;

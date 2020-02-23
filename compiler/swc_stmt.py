@@ -138,20 +138,18 @@ class Parser:
             if sym == ";":
                 stmt_list.append(_Stmt("expr", expr = expr))
                 continue
-            if sym not in swc_token.ASSIGN_SYM_SET:
-                t.syntax_err("需要‘;’或赋值")
+            if sym != "=":
+                t.syntax_err("需要‘;’或‘=’")
 
             lvalue = expr
             if not lvalue.is_lvalue:
                 expr_token.syntax_err("需要左值")
-            if sym != "=" and lvalue.op in ("[:]", "tuple"):
-                expr_token.syntax_err("不能对切片或多左值进行增量赋值")
             expr = self.expr_parser.parse(var_map_stk)
             self.token_list.pop_sym(";")
             final_gv = lvalue.get_final_gv()
             if final_gv is not None:
                 expr_token.syntax_err("不能对final修饰的全局变量‘%s’赋值" % final_gv)
-            stmt_list.append(_Stmt("assign", lvalue = lvalue, sym = sym, expr = expr))
+            stmt_list.append(_Stmt("assign", lvalue = lvalue, expr = expr))
 
     def def_func_obj(self, func_obj):
         self.stmt_list_stk[-1].append(_Stmt("def_func_obj", func_obj = func_obj))

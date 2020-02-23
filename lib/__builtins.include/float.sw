@@ -32,7 +32,7 @@ public class float
         if (isinstanceof(x, int))
         {
             !<<
-            this.v = float64(l_x.(*sw_cls_@<<:int>>).v)
+            this.v = float64(l_x.(*sw_cls_@<<:_int>>).v)
             !>>
             return;
         }
@@ -47,7 +47,8 @@ public class float
 
     public func __bool__()
     {
-        return this != 0.0;
+        //todo
+        throw(NotImpl());
     }
 
     func _cmp_oper(op, other)
@@ -148,7 +149,7 @@ func sw_obj_float_from_go_float(f float64) *sw_cls_@<<:float>> {
 
 func sw_obj_number_to_go_float(x sw_obj) (v float64, ok bool) {
     switch o := x.(type) {
-    case *sw_cls_@<<:int>>:
+    case *sw_cls_@<<:_int>>:
         return float64(o.v), true
     case *sw_cls_@<<:float>>:
         return o.v, true

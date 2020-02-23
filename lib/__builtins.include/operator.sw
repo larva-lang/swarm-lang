@@ -21,9 +21,9 @@ func _cmp_oper(op, a, b)
         panic("bug")
     }
     !>>
-    if (!isinstanceof(result, bool))
+    if (!isinstanceof(result, int))
     {
-        throw(TypeError("‘__%s__’方法返回的对象不是bool类型".(op)));
+        throw(TypeError("‘__%s__’方法返回的对象不是int类型".(op)));
     }
     return result;
 }

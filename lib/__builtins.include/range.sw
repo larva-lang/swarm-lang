@@ -21,7 +21,7 @@ public class range
     public func next()
     {
         var ret = this.curr;
-        this.curr += 1;
+        this.curr = this.curr + 1;
         return ret;
     }
 }

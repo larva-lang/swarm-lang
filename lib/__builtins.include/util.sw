@@ -36,7 +36,7 @@ func sw_util_to_go_fmt_str(format string, x sw_obj) string {
         if format == "%t" {
             return fmt.Sprintf(format, o.v)
         }
-    case *sw_cls_@<<:int>>:
+    case *sw_cls_@<<:_int>>:
         switch format {
         case "%c", "%d":
             if format != "%c" || (o.v >= 0 && o.v <= 0xFF) {

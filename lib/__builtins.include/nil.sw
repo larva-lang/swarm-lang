@@ -7,7 +7,7 @@ public class NilType
 
     public func __bool__()
     {
-        return false;
+        return 0;
     }
 
     public func __eq__(other)

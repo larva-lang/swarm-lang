@@ -6,16 +6,6 @@ import swc_util
 
 #用于解析token的正则表达式
 _TOKEN_RE = re.compile(
-    #浮点数
-    r"""(\d+\.?\d*[eE][+-]?\w+|"""
-    r"""\.\d+[eE][+-]?\w+|"""
-    r"""\d+\.\w*|"""
-    r"""\.\d\w*)|"""
-    #十六进制浮点数
-    r"""(0[xX][0-9A-Fa-f]+\.?[0-9A-Fa-f]*[pP][+-]?\w+|"""
-    r"""0[xX]\.[0-9A-Fa-f]+[pP][+-]?\w+|"""
-    r"""0[xX][0-9A-Fa-f]+\.\w*|"""
-    r"""0[xX]\.[0-9A-Fa-f]\w*)|"""
     #符号
     r"""(!=|==|<<=|<<|<=|>>=|>>|>=|[-%^&*+|/]=|&&|\|\||\W)|"""
     #整数
@@ -23,14 +13,13 @@ _TOKEN_RE = re.compile(
     #词，关键字或标识符
     r"""([a-zA-Z_]\w*)""")
 
-ASSIGN_SYM_SET = set(["="] + [_op + "=" for _op in ("%", "^", "&", "*", "-", "+", "|", "/", "<<", ">>")])
 BINOCULAR_OP_SYM_SET = set(["%", "^", "&", "*", "-", "+", "|", "<", ">", "/", "!=", "==", "<<", "<=", ">>", ">=", "&&", "||"]) #不含is
 
 #合法的符号集
-_SYM_SET = set("""~!(){}[]:;'",.""") | BINOCULAR_OP_SYM_SET | ASSIGN_SYM_SET
+_SYM_SET = set("""~!()={}[]:;'",.""") | BINOCULAR_OP_SYM_SET
 
-_RESERVED_WORD_SET = set(["import", "class", "func", "for", "while", "if", "else", "return", "nil", "true", "false", "break", "continue",
-                          "this", "public", "var", "defer", "final", "is", "isinstanceof"])
+_RESERVED_WORD_SET = set(["import", "class", "func", "for", "while", "if", "else", "return", "nil", "break", "continue", "this", "public",
+                          "var", "defer", "final", "is", "isinstanceof", "int"])
 
 class _Token:
     def __init__(self, type, value, src_fn, line_idx, pos):
@@ -69,7 +58,7 @@ class _Token:
             def __nonzero__(self):
                 return self.token.type.startswith("literal_")
             def __call__(self, type):
-                assert type in ("nil", "bool", "int", "float", "str")
+                assert type in ("nil", "int", "str")
                 return self and self.token.type == "literal_" + type
         self.is_literal = IsLiteral(self)
 
@@ -287,22 +276,9 @@ class Parser:
         assert m.start() == 0 and m.end() > 0
         next_pos = self.pos + m.end()
 
-        f, hex_f, sym, i, w = m.groups()
+        sym, i, w = m.groups()
 
         try:
-            if f is not None or hex_f is not None:
-                #浮点数
-                if f is None:
-                    f = hex_f
-
-                try:
-                    value = float(f) if hex_f is None else float.fromhex(f)
-                    if math.isnan(value) or math.isinf(value):
-                        raise ValueError
-                except ValueError:
-                    _syntax_err(self, "非法的浮点字面量‘%s’" % f)
-                return _Token("literal_float", value, self.src_fn, self.line_idx, token_pos)
-
             if sym is not None:
                 #符号
                 if sym not in _SYM_SET:
@@ -347,8 +323,6 @@ class Parser:
                 return _Token("literal_int", value, self.src_fn, self.line_idx, token_pos)
 
             if w is not None:
-                if w in ("true", "false"):
-                    return _Token("literal_bool", w, self.src_fn, self.line_idx, token_pos)
                 if w == "nil":
                     return _Token("literal_nil", w, self.src_fn, self.line_idx, token_pos)
                 return _Token("word", w, self.src_fn, self.line_idx, token_pos)

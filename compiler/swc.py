@@ -1,6 +1,6 @@
 #coding=utf8
 
-import sys, getopt, os, shutil
+import sys, getopt, os, shutil, time
 
 import swc_util, swc_token, swc_mod, swc_out
 
@@ -40,8 +40,11 @@ def main():
     #目标输出路径
     swc_out.out_dir = "%s/tmp/out/%s" % (sw_dir, main_mod_name)
 
+    compile_start_time = time.time()
+
     swc_mod.precompile(main_mod_name)
     swc_mod.compile()
+    swc_util.vlog("编译完成，耗时%.2f秒" % (time.time() - compile_start_time))
 
     swc_out.output()
 

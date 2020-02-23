@@ -60,7 +60,7 @@ public class str
     {
         var real_idx = _make_array_real_idx("str", idx, this.len());
         !<<
-        i := l_real_idx.(*sw_cls_@<<:int>>).v
+        i := l_real_idx.(*sw_cls_@<<:_int>>).v
         return sw_obj_str_from_go_str(this.v[i : i + 1])
         !>>
     }
@@ -69,8 +69,8 @@ public class str
     {
         (bi, ei) = _make_array_real_slice_range("str", bi, ei, this.len());
         !<<
-        b := l_bi.(*sw_cls_@<<:int>>).v
-        e := l_ei.(*sw_cls_@<<:int>>).v
+        b := l_bi.(*sw_cls_@<<:_int>>).v
+        e := l_ei.(*sw_cls_@<<:_int>>).v
         return sw_obj_str_from_go_str(this.v[b : e])
         !>>
     }
@@ -125,7 +125,7 @@ public class str
         {
             !<<
             this_len    := int64(len(this.v))
-            count       := l_other.(*sw_cls_@<<:int>>).v
+            count       := l_other.(*sw_cls_@<<:_int>>).v
             if count < 0 || (count > 0 && this_len * count / count != this_len) {
             !>>
                 throw(ValueError("‘str*count’运算参数错误，count=%d，字符串长度=%d".(other, this.len())));
@@ -156,11 +156,11 @@ public class str
         v := l_s.(*sw_cls_@<<:str>>).v
         if strings.Contains(this.v, v) {
         !>>
-            return true;
+            return 1;
         !<<
         } else {
         !>>
-            return false;
+            return 0;
         !<<
         }
         !>>
