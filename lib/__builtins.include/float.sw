@@ -9,7 +9,7 @@ public class float
         if (isinstanceof(x, str))
         {
             !<<
-            s := l_x.(*sw_cls_@<<:str>>).v
+            s := l_x.go_str()
             v, err := strconv.ParseFloat(s, 64)
             if err != nil {
             !>>
@@ -24,7 +24,7 @@ public class float
         if (isinstanceof(x, float))
         {
             !<<
-            this.v = l_x.(*sw_cls_@<<:float>>).v
+            this.v = l_x.ov.(*sw_cls_@<<:float>>).v
             !>>
             return;
         }
@@ -32,7 +32,7 @@ public class float
         if (isinstanceof(x, int))
         {
             !<<
-            this.v = float64(l_x.(*sw_cls_@<<:_int>>).v)
+            this.v = float64(l_x.go_int())
             !>>
             return;
         }
@@ -56,7 +56,7 @@ public class float
         !<<
         if v, ok := sw_obj_number_to_go_float(l_other); ok {
             var result bool
-            switch l_op.(*sw_cls_@<<:str>>).v {
+            switch l_op.go_str() {
             case "<":
                 result = this.v < v
             case "==":
@@ -85,7 +85,7 @@ public class float
         !<<
         if v, ok := sw_obj_number_to_go_float(l_other); ok {
             var result float64
-            switch l_op.(*sw_cls_@<<:str>>).v {
+            switch l_op.go_str() {
             case "+":
                 result = this.v + v
             case "-":
@@ -141,16 +141,18 @@ public class float
 
 !<<
 
-func sw_obj_float_from_go_float(f float64) *sw_cls_@<<:float>> {
-    return &sw_cls_@<<:float>>{
-        v:  f,
+func sw_obj_float_from_go_float(f float64) sw_obj {
+    return sw_obj{
+        ov: &sw_cls_@<<:float>>{
+            v:  f,
+        },
     }
 }
 
 func sw_obj_number_to_go_float(x sw_obj) (v float64, ok bool) {
-    switch o := x.(type) {
-    case *sw_cls_@<<:_int>>:
-        return float64(o.v), true
+    switch o := x.ov.(type) {
+    case nil:
+        return float64(x.iv), true
     case *sw_cls_@<<:float>>:
         return o.v, true
     default:

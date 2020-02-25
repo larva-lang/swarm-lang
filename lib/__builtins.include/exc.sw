@@ -14,7 +14,7 @@ public func rethrow(exc, tb)
     !<<
     panic(&sw_exc_stru_catched{
         exc:    l_exc,
-        tb:     l_tb.(*sw_cls_@<<:str>>).v,
+        tb:     l_tb.go_str(),
     })
     !>>
 }
@@ -102,9 +102,7 @@ type sw_exc_stru_catched struct {
 
 func sw_exc_create_catched(exc sw_obj, skip int) *sw_exc_stru_catched {
     var tb_line_list []string
-    if exc != nil {
-        tb_line_list = append(tb_line_list, exc.type_name() + ": " + sw_obj_to_go_str(exc))
-    }
+    tb_line_list = append(tb_line_list, exc.type_name() + ": " + sw_obj_to_go_str(exc))
     for i := skip; true; i ++ {
         pc, file, line, ok := runtime.Caller(i)
         if !ok {

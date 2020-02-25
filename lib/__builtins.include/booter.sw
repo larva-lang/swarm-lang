@@ -1,3 +1,11 @@
+class _GoPanic
+{
+    public func __str__()
+    {
+        return "go panic";
+    }
+}
+
 !<<
 
 func sw_booter_output_unhandled_exc(c *sw_exc_stru_catched) {
@@ -9,7 +17,7 @@ func sw_booter_check_go_panic() {
     if r != nil {
         fmt.Fprintln(os.Stderr, "process crash:", r)
         fmt.Fprintln(os.Stderr, "traceback:")
-        fmt.Fprintln(os.Stderr, sw_exc_create_catched(nil, 0).tb)
+        fmt.Fprintln(os.Stderr, sw_exc_create_catched(sw_obj{ov: &sw_cls_@<<:_GoPanic>>{}}, 0).tb)
         panic(r)
     }
 }

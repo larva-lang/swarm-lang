@@ -264,5 +264,5 @@ public func main()
     proc_0();
     var tm = time.time() - ts;
     println("Time used: %s sec".(tm));
-    println("This machine benchmarks at %s SwarmStones/second".(LOOPS / tm));
+    println("This machine benchmarks at %s SwarmStones/second".(float(LOOPS) / tm));
 }

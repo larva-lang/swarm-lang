@@ -60,7 +60,7 @@ class _Array
     {
         var real_idx = _make_array_real_idx("%T".(this), idx, this.size());
         !<<
-        i := l_real_idx.(*sw_cls_@<<:_int>>).v
+        i := l_real_idx.go_int()
         return this.v[i]
         !>>
     }
@@ -69,8 +69,8 @@ class _Array
     {
         (bi, ei) = _make_array_real_slice_range("%T".(this), bi, ei, this.size());
         !<<
-        b := l_bi.(*sw_cls_@<<:_int>>).v
-        e := l_ei.(*sw_cls_@<<:_int>>).v
+        b := l_bi.go_int()
+        e := l_ei.go_int()
         s := this.v[b : e]
         !>>
         if (isinstanceof(this, tuple))
@@ -153,7 +153,7 @@ class _Array
         {
             !<<
             this_len    := int64(len(this.v))
-            count       := l_other.(*sw_cls_@<<:_int>>).v
+            count       := l_other.go_int()
             if count < 0 || (count > 0 && this_len * count / count != this_len) {
             !>>
                 throw(ValueError("‘%T*count’运算参数错误，count=%d，容器大小=%d".(this, other, this.size())));
@@ -188,7 +188,7 @@ class _Array
     public func size()
     {
         !<<
-        return sw_obj_int_from_go_int(int64(len(this.v)))
+        return sw_obj{iv: int64(len(this.v))}
         !>>
     }
 
