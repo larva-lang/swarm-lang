@@ -182,7 +182,7 @@ class _ParseStk:
 
 def _is_expr_end(t):
     if t.is_sym:
-        if t.value in (")", "]", ",", ";", ":", "}", "="):
+        if t.value in (set([")", "]", ",", ";", ":", "}"]) | swc_token.ASSIGN_SYM_SET):
             return True
     return False
 
@@ -303,36 +303,28 @@ class Parser:
                 self.token_list.pop_sym("(")
                 e = self.parse(var_map_stk)
                 self.token_list.pop_sym(",")
-                t = self.token_list.pop()
-                if t.is_reserved("int"):
-                    if e.op == "this":
-                        t.syntax_err("‘int’不是一个库实现的类，不能判断‘this’是否为int类型")
-                    parse_stk._push_expr(_Expr("isinstanceof_int", e))
-                elif t.is_name:
-                    name = t.value
-                    if name in self.mod.dep_mod_set:
-                        m = swc_mod.mod_map[name]
-                        self.token_list.pop_sym(".")
-                        _, name = self.token_list.pop_name()
-                        cls = m.cls_map.get(name)
-                        if cls is None:
-                            t.syntax_err("无效的类‘%s.%s’" % (m, name))
-                    else:
-                        for m in self.mod, swc_mod.builtins_mod:
-                            cls = m.cls_map.get(name)
-                            if cls is not None:
-                                break
-                        else:
-                            t.syntax_err("无效的类‘%s’" % name)
-                    if e.op == "this":
-                        #对this做判断需要特殊处理下
-                        assert self.cls is not None
-                        parse_stk._push_expr(_Expr("isinstanceof_this", cls is self.cls))
-                    else:
-                        parse_stk._push_expr(_Expr("isinstanceof", (e, cls)))
+                t, name = self.token_list.pop_name()
+                if name in self.mod.dep_mod_set:
+                    m = swc_mod.mod_map[name]
+                    self.token_list.pop_sym(".")
+                    _, name = self.token_list.pop_name()
+                    cls = m.cls_map.get(name)
+                    if cls is None:
+                        t.syntax_err("无效的类‘%s.%s’" % (m, name))
                 else:
-                    t.syntax_err("需要类型")
+                    for m in self.mod, swc_mod.builtins_mod:
+                        cls = m.cls_map.get(name)
+                        if cls is not None:
+                            break
+                    else:
+                        t.syntax_err("无效的类‘%s’" % name)
                 self.token_list.pop_sym(")")
+                if e.op == "this":
+                    #对this做判断需要特殊处理下
+                    assert self.cls is not None
+                    parse_stk._push_expr(_Expr("isinstanceof_this", cls is self.cls))
+                else:
+                    parse_stk._push_expr(_Expr("isinstanceof", (e, cls)))
 
             else:
                 t.syntax_err("非法的表达式")
@@ -439,17 +431,26 @@ class Parser:
 
             if elem.is_cls:
                 #调用的是类的构造函数，获取其参数表
-                construct_method = elem.get_construct_method(len(el))
-                if construct_method is None:
-                    if el:
-                        name_token.syntax_err("无法创建‘%s.%s’的实例，没有构造方法‘__init__<%d>’" % (mod, name, len(el)))
-                    #使用默认构造方法
-                    construct_method_is_public = False
+                if mod is swc_mod.builtins_mod and name == "bool":
+                    '''
+                    虽然bool(x)从形式上是用x构建bool类的实例（同时也是几个基础类型的转换语法），但是由于true和false是全局唯一的，
+                    而Swarm不打算支持类似Python的__new__的机制，所以特殊处理下，其他对象则严格按new_obj进行
+                    '''
+                    if len(el) != 1:
+                        el_start_token("参数数量错误，构造‘bool’对象需要1个参数")
+                    op = "cast_to_bool"
                 else:
-                    construct_method_is_public = construct_method.is_public
-                if not (construct_method_is_public or self.mod is mod):
-                    name_token.syntax_err("无法创建‘%s.%s’的实例，对构造方法‘__init__<%d>’没有权限" % (mod, name, len(el)))
-                op = "new_obj"
+                    construct_method = elem.get_construct_method(len(el))
+                    if construct_method is None:
+                        if el:
+                            name_token.syntax_err("无法创建‘%s.%s’的实例，没有构造方法‘__init__<%d>’" % (mod, name, len(el)))
+                        #使用默认构造方法
+                        construct_method_is_public = False
+                    else:
+                        construct_method_is_public = construct_method.is_public
+                    if not (construct_method_is_public or self.mod is mod):
+                        name_token.syntax_err("无法创建‘%s.%s’的实例，对构造方法‘__init__<%d>’没有权限" % (mod, name, len(el)))
+                    op = "new_obj"
             elif elem.is_func:
                 arg_count = len(el)
                 for elem in elems:

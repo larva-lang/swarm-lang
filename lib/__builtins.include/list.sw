@@ -6,7 +6,7 @@ public class list(_Array)
     {
         var real_idx = _make_array_real_idx("list", idx, this.size());
         !<<
-        i := l_real_idx.go_int()
+        i := l_real_idx.(*sw_cls_@<<:int>>).v
         this.v[i] = l_x
         !>>
     }
@@ -43,7 +43,7 @@ public class list(_Array)
     {
         var real_idx = _make_array_real_idx("list", idx, this.size());
         !<<
-        i := l_real_idx.go_int()
+        i := l_real_idx.(*sw_cls_@<<:int>>).v
         this.v = append(this.v[: i], this.v[i + 1 :]...)
         !>>
         return this;
@@ -66,14 +66,12 @@ class listiter(_ArrayIter)
 
 !<<
 
-func sw_obj_list_from_go_slice(s []sw_obj, need_copy bool) sw_obj {
+func sw_obj_list_from_go_slice(s []sw_obj, need_copy bool) *sw_cls_@<<:list>> {
     if need_copy {
         s = sw_util_copy_go_slice(s)
     }
-    return sw_obj{
-        ov: &sw_cls_@<<:list>>{
-            v:  s,
-        },
+    return &sw_cls_@<<:list>>{
+        v:  s,
     }
 }
 

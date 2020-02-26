@@ -60,7 +60,7 @@ class _Array
     {
         var real_idx = _make_array_real_idx("%T".(this), idx, this.size());
         !<<
-        i := l_real_idx.go_int()
+        i := l_real_idx.(*sw_cls_@<<:int>>).v
         return this.v[i]
         !>>
     }
@@ -69,8 +69,8 @@ class _Array
     {
         (bi, ei) = _make_array_real_slice_range("%T".(this), bi, ei, this.size());
         !<<
-        b := l_bi.go_int()
-        e := l_ei.go_int()
+        b := l_bi.(*sw_cls_@<<:int>>).v
+        e := l_ei.(*sw_cls_@<<:int>>).v
         s := this.v[b : e]
         !>>
         if (isinstanceof(this, tuple))
@@ -97,13 +97,13 @@ class _Array
             var (this_sz, other_sz) = (this.size(), other.size());
             if (op == "==" && this_sz != other_sz)
             {
-                return 0;
+                return false;
             }
             for (var i: range(0, min(this_sz, other_sz)))
             {
                 if ((op == "<" && this[i] >= other[i]) || (op == "==" && this[i] != other[i]))
                 {
-                    return 0;
+                    return false;
                 }
             }
             return this_sz <= other_sz;
@@ -153,7 +153,7 @@ class _Array
         {
             !<<
             this_len    := int64(len(this.v))
-            count       := l_other.go_int()
+            count       := l_other.(*sw_cls_@<<:int>>).v
             if count < 0 || (count > 0 && this_len * count / count != this_len) {
             !>>
                 throw(ValueError("‘%T*count’运算参数错误，count=%d，容器大小=%d".(this, other, this.size())));
@@ -188,7 +188,7 @@ class _Array
     public func size()
     {
         !<<
-        return sw_obj{iv: int64(len(this.v))}
+        return sw_obj_int_from_go_int(int64(len(this.v)))
         !>>
     }
 
@@ -218,7 +218,7 @@ class _ArrayIter
     public func next()
     {
         var curr = this.a[this.curr_idx];
-        this.curr_idx = this.curr_idx + 1;
+        this.curr_idx += 1;
         return curr;
     }
 }
@@ -256,7 +256,7 @@ func _make_array_real_slice_range(type_name, bi, ei, sz)
     var fix_idx = func (i) {
         if (i < 0)
         {
-            i = i + sz;
+            i += sz;
         }
         return min(max(0, i), sz);
     };

@@ -35,7 +35,7 @@ public class str
     {
         var s = _to_str("str", x);
         !<<
-        this.v = l_s.go_str()
+        this.v = l_s.(*sw_cls_@<<:str>>).v
         !>>
     }
 
@@ -60,7 +60,7 @@ public class str
     {
         var real_idx = _make_array_real_idx("str", idx, this.len());
         !<<
-        i := l_real_idx.go_int()
+        i := l_real_idx.(*sw_cls_@<<:int>>).v
         return sw_obj_str_from_go_str(this.v[i : i + 1])
         !>>
     }
@@ -69,8 +69,8 @@ public class str
     {
         (bi, ei) = _make_array_real_slice_range("str", bi, ei, this.len());
         !<<
-        b := l_bi.go_int()
-        e := l_ei.go_int()
+        b := l_bi.(*sw_cls_@<<:int>>).v
+        e := l_ei.(*sw_cls_@<<:int>>).v
         return sw_obj_str_from_go_str(this.v[b : e])
         !>>
     }
@@ -80,9 +80,9 @@ public class str
         if (isinstanceof(other, str))
         {
             !<<
-            v := l_other.go_str()
+            v := l_other.(*sw_cls_@<<:str>>).v
             var result bool
-            switch l_op.go_str() {
+            switch l_op.(*sw_cls_@<<:str>>).v {
             case "<":
                 result = this.v < v
             case "==":
@@ -112,7 +112,7 @@ public class str
         if (isinstanceof(other, str))
         {
             !<<
-            return sw_obj_str_from_go_str(this.v + l_other.go_str())
+            return sw_obj_str_from_go_str(this.v + l_other.(*sw_cls_@<<:str>>).v)
             !>>
         }
 
@@ -125,7 +125,7 @@ public class str
         {
             !<<
             this_len    := int64(len(this.v))
-            count       := l_other.go_int()
+            count       := l_other.(*sw_cls_@<<:int>>).v
             if count < 0 || (count > 0 && this_len * count / count != this_len) {
             !>>
                 throw(ValueError("‘str*count’运算参数错误，count=%d，字符串长度=%d".(other, this.len())));
@@ -141,7 +141,7 @@ public class str
     public func len()
     {
         !<<
-        return sw_obj{iv: int64(len(this.v))}
+        return sw_obj_int_from_go_int(int64(len(this.v)))
         !>>
     }
 
@@ -153,14 +153,14 @@ public class str
         }
 
         !<<
-        v := l_s.go_str()
+        v := l_s.(*sw_cls_@<<:str>>).v
         if strings.Contains(this.v, v) {
         !>>
-            return 1;
+            return true;
         !<<
         } else {
         !>>
-            return 0;
+            return false;
         !<<
         }
         !>>
@@ -184,7 +184,7 @@ public class str
                 throw(TypeError("str.join(iterable)的参数的迭代元素必须是字符串"));
             }
             !<<
-            sl = append(sl, l_s.go_str())
+            sl = append(sl, l_s.(*sw_cls_@<<:str>>).v)
             !>>
         }
         !<<
@@ -195,17 +195,15 @@ public class str
 
 !<<
 
-func sw_obj_str_from_go_str(s string) sw_obj {
-    return sw_obj{
-        ov: &sw_cls_@<<:str>>{
-            v:  s,
-        },
+func sw_obj_str_from_go_str(s string) *sw_cls_@<<:str>> {
+    return &sw_cls_@<<:str>>{
+        v:  s,
     }
 }
 
 func sw_obj_to_go_str(obj sw_obj) string {
     //直接构造str对象并返回其内部value
-    return sw_new_obj_sw_cls_@<<:str>>_1(obj).go_str()
+    return sw_new_obj_sw_cls_@<<:str>>_1(obj).v
 }
 
 !>>

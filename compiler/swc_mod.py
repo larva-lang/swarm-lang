@@ -33,7 +33,8 @@ def _make_internal_method_sign_set():
     add_internal_method_sign("eq", 1)
     #双目数值运算
     for name in "add", "sub", "mul", "div", "mod", "shl", "shr", "and", "or", "xor":
-        add_internal_method_sign(name, 1)
+        for prefix in "", "i_":
+            add_internal_method_sign(prefix + name, 1)
     #单目数值运算
     for name in "inv", "pos", "neg":
         add_internal_method_sign(name, 0)
@@ -193,7 +194,7 @@ class _Method:
 
         all_usr_method_sign_set.add((self.name, len(self.arg_map)))
 
-    __repr__ = __str__ = lambda self : "%s.%s<%d>" % (self.cls, self.name, len(self.arg_map))
+    __repr__ = __str__ = lambda self : "%s.%s" % (self.cls, self.name)
 
     def _compile(self):
         self.stmt_list = swc_stmt.Parser(self.block_token_list, self.cls.mod, self.cls, self).parse((self.arg_map.copy(),), 0)

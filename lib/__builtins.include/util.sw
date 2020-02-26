@@ -2,7 +2,7 @@
 public func abort(s)
 {
     !<<
-    s, ok := l_s.ov.(*sw_cls_@<<:str>>)
+    s, ok := l_s.(*sw_cls_@<<:str>>)
     if ok {
         panic(s.v)
     } else {
@@ -18,7 +18,7 @@ func sw_util_sprintf(format string, args ...interface{}) string {
 }
 
 func sw_util_obj_addr(x sw_obj) uint64 {
-    return uint64(reflect.ValueOf(&x.ov).Elem().InterfaceData()[1])
+    return uint64(reflect.ValueOf(&x).Elem().InterfaceData()[1])
 }
 
 func sw_util_to_go_fmt_str(format string, x sw_obj) string {
@@ -28,20 +28,22 @@ func sw_util_to_go_fmt_str(format string, x sw_obj) string {
     case "%s":
         return sw_obj_to_go_str(x)
     case "%r":
-        return sw_func_@<<:repr>>_1(x).go_str()
+        return sw_func_@<<:repr>>_1(x).(*sw_cls_@<<:str>>).v
     }
 
-    switch o := x.ov.(type) {
-    case nil:
+    switch o := x.(type) {
+    case *sw_cls_@<<:bool>>:
+        if format == "%t" {
+            return fmt.Sprintf(format, o.v)
+        }
+    case *sw_cls_@<<:int>>:
         switch format {
-        case "%t":
-            return fmt.Sprintf(format, x.iv != 0)
         case "%c", "%d":
-            if format != "%c" || (x.iv >= 0 && x.iv <= 0xFF) {
-                return fmt.Sprintf(format, x.iv)
+            if format != "%c" || (o.v >= 0 && o.v <= 0xFF) {
+                return fmt.Sprintf(format, o.v)
             }
         case "%b", "%o", "%x", "%X":
-            return fmt.Sprintf(format, uint64(x.iv))
+            return fmt.Sprintf(format, uint64(o.v))
         }
     case *sw_cls_@<<:float>>:
         switch format {

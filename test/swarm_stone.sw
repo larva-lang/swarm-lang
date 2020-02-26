@@ -17,7 +17,7 @@ class Record
 final var (IDENT_0, IDENT_1, IDENT_2, IDENT_3, IDENT_4, IDENT_5) = (0, 1, 2, 3, 4, 5);
 final var LOOPS = 50000;
 
-var (int_glob, bool_glob, char_1_glob, char_2_glob) = (0, 0, 0, 0);
+var (int_glob, bool_glob, char_1_glob, char_2_glob) = (0, false, 0, 0);
 var array_1_glob = [0] * 51;
 var array_2_glob = map(range(0, 51), func (i) {
     return [0] * 51;
@@ -29,11 +29,11 @@ func func_3(enum_par_in)
     var enum_loc = enum_par_in;
     if (enum_loc == IDENT_3)
     {
-        return 1;
+        return true;
     }
     else
     {
-        return 0;
+        return false;
     }
 }
 
@@ -45,7 +45,7 @@ func func_2(str_par_1, str_par_2)
         if (func_1(str_par_1[int_loc], str_par_2[int_loc + 1]) == IDENT_1)
         {
             char_loc = 65;
-            int_loc = int_loc + 1;
+            int_loc += 1;
         }
     }
     if (char_loc >= 87 && char_loc <= 90)
@@ -54,18 +54,18 @@ func func_2(str_par_1, str_par_2)
     }
     if (char_loc == 88)
     {
-        return 1;
+        return true;
     }
     else
     {
         if (str_par_1 > str_par_2)
         {
-            int_loc = int_loc + 7;
-            return 1;
+            int_loc += 7;
+            return true;
         }
         else
         {
-            return 0;
+            return false;
         }
     }
 }
@@ -94,7 +94,7 @@ func proc_8(array_1_par, array_2_par, int_par_1, int_par_2)
     {
         array_2_par[int_loc][int_idx] = int_loc;
     }
-    array_2_par[int_loc][int_loc - 1] = array_2_par[int_loc][int_loc - 1] + 1;
+    array_2_par[int_loc][int_loc - 1] += 1;
     array_2_par[int_loc + 20][int_loc] = array_1_par[int_loc];
     int_glob = 5;
 }
@@ -145,7 +145,7 @@ func proc_6(enum_par_in)
 func proc_5()
 {
     char_1_glob = 65;
-    bool_glob = 0;
+    bool_glob = false;
 }
 
 func proc_4()
@@ -173,11 +173,11 @@ func proc_2(int_ptr_io)
 {
     var int_loc = int_ptr_io + 10;
     var enum_loc = IDENT_0;
-    while (1)
+    while (true)
     {
         if (char_1_glob == 65)
         {
-            int_loc = int_loc - 1;
+            int_loc -= 1;
             int_ptr_io = int_loc - int_glob;
             enum_loc = IDENT_1;
         }
@@ -239,7 +239,7 @@ func proc_0()
         {
             int_loc_3 = 5 * int_loc_1 - int_loc_2;
             int_loc_3 = proc_7(int_loc_1, int_loc_2);
-            int_loc_1 = int_loc_1 + 1;
+            int_loc_1 += 1;
         }
         proc_8(array_1_glob, array_2_glob, int_loc_1, int_loc_3);
         proc_1(ptr_glob);
@@ -264,5 +264,5 @@ public func main()
     proc_0();
     var tm = time.time() - ts;
     println("Time used: %s sec".(tm));
-    println("This machine benchmarks at %s SwarmStones/second".(float(LOOPS) / tm));
+    println("This machine benchmarks at %s SwarmStones/second".(LOOPS / tm));
 }

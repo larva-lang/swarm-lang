@@ -8,7 +8,7 @@ func _cmp_oper(op, a, b)
 {
     var result;
     !<<
-    switch l_op.go_str() {
+    switch l_op.(*sw_cls_@<<:str>>).v {
     case "lt":
     !>>
         result = a.__lt__(b);
@@ -21,9 +21,9 @@ func _cmp_oper(op, a, b)
         panic("bug")
     }
     !>>
-    if (!isinstanceof(result, int))
+    if (!isinstanceof(result, bool))
     {
-        throw(TypeError("‘__%s__’方法返回的对象不是int类型".(op)));
+        throw(TypeError("‘__%s__’方法返回的对象不是bool类型".(op)));
     }
     return result;
 }
@@ -41,11 +41,11 @@ public func equals(a, b)
 !<<
 
 func sw_obj_lt(a, b sw_obj) bool {
-    return sw_func_@<<:less_than>>_2(a, b).go_int() != 0
+    return sw_func_@<<:less_than>>_2(a, b).(*sw_cls_@<<:bool>>).v
 }
 
 func sw_obj_eq(a, b sw_obj) bool {
-    return sw_func_@<<:equals>>_2(a, b).go_int() != 0
+    return sw_func_@<<:equals>>_2(a, b).(*sw_cls_@<<:bool>>).v
 }
 
 !>>

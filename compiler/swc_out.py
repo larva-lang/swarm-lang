@@ -177,6 +177,9 @@ def _gen_arg_def(arg_map, need_perm_arg = False):
 def _gen_nil_literal():
     return "sw_util_nil_obj"
 
+def _gen_bool_literal(b):
+    return _gen_mod_elem_name(_get_builtins_gv("_bool_obj_%s" % ("true" if b else "false")))
+
 def _gen_new_obj_func_name(cls, arg_count):
     return "sw_new_obj_%s_%d" % (_gen_mod_elem_name(cls), arg_count)
 
@@ -184,7 +187,7 @@ def _gen_func_obj_stru_name(arg_count):
     return "sw_fo_stru_%d" % arg_count
 
 def _gen_internal_simple_exc(exc_cls_name, info):
-    return "sw_obj{ov: &%s{m_s: sw_obj_str_from_go_str(%s)}}" % (_gen_mod_elem_name(_get_builtins_cls(exc_cls_name)), _gen_str_literal(info))
+    return "&%s{m_s: sw_obj_str_from_go_str(%s)}" % (_gen_mod_elem_name(_get_builtins_cls(exc_cls_name)), _gen_str_literal(info))
 
 def _gen_throw_no_perm_exc(info):
     return _gen_throw_exc(_gen_internal_simple_exc("NoPerm", info))
@@ -229,9 +232,6 @@ _BINOCULAR_OP_2_INTERNAL_METHOD = {
     "^":    "xor",
 }
 
-_BINOCULAR_OP_INTERNAL_METHOD_2_OP = dict([(_v, _k) for (_k, _v) in _BINOCULAR_OP_2_INTERNAL_METHOD.iteritems()])
-del _k, _v
-
 def _gen_el_code(el, with_perm = False):
     mod = _curr_mod
 
@@ -246,8 +246,9 @@ def _gen_expr_code(expr):
         t = expr.arg
         if t.is_literal("nil"):
             return _gen_nil_literal()
-        if t.is_literal("int"):
-            return "sw_obj{iv: %d}" % t.value
+        if t.is_literal("bool"):
+            assert t.value in ("true", "false")
+            return _gen_bool_literal(t.value == "true")
         return "%s" % _gen_literal_name(t)
 
     if expr.op == "str_format":
@@ -259,15 +260,11 @@ def _gen_expr_code(expr):
 
     if expr.op == "isinstanceof_this":
         result = expr.arg
-        return "sw_obj{iv: %d}" % (1 if result else 0)
+        return _gen_bool_literal(result)
 
     if expr.op == "isinstanceof":
         e, cls = expr.arg
-        return "sw_obj_bool_from_go_bool(func () bool {_, ok := (%s).ov.(*%s); return ok}())" % (_gen_expr_code(e), _gen_mod_elem_name(cls))
-
-    if expr.op == "isinstanceof_int":
-        e = expr.arg
-        return "sw_obj_bool_from_go_bool((%s).ov == nil)" % _gen_expr_code(e)
+        return "sw_obj_bool_from_go_bool(func () bool {_, ok := (%s).(*%s); return ok}())" % (_gen_expr_code(e), _gen_mod_elem_name(cls))
 
     if expr.op == "func_obj":
         fo = expr.arg
@@ -277,13 +274,18 @@ def _gen_expr_code(expr):
         verb, e = expr.arg
         return "sw_util_to_go_fmt_str(%s, (%s))" % (_gen_str_literal("%" + verb), _gen_expr_code(e))
 
+    if expr.op == "cast_to_bool":
+        cls, (e,) = expr.arg
+        assert cls is _get_builtins_cls("bool")
+        return "%s(%s)" % (_gen_mod_elem_name(_get_builtins_func("_cast_to_bool", 1)), _gen_expr_code(e))
+
     if expr.op == "new_obj":
         cls, el = expr.arg
         assert cls.is_cls
         return "%s(%s)" % (_gen_new_obj_func_name(cls, len(el)), _gen_el_code(el))
 
     if expr.op == "this":
-        return "sw_obj{ov: this}"
+        return "this"
 
     if expr.op == "this.attr":
         name = expr.arg
@@ -317,11 +319,11 @@ def _gen_expr_code(expr):
     if expr.op in ("tuple", "list"):
         cls = _get_builtins_cls(expr.op)
         el = expr.arg
-        return "sw_obj{ov: &%s{v: []sw_obj{%s}}}" % (_gen_mod_elem_name(cls), _gen_el_code(el))
+        return "&%s{v: []sw_obj{%s}}" % (_gen_mod_elem_name(cls), _gen_el_code(el))
 
     if expr.op == "dict":
         kvel = expr.arg
-        ecl = ["%s().reserve_space(sw_obj{iv: (%d)})" % (_gen_new_obj_func_name(_get_builtins_cls("dict"), 0), len(kvel))]
+        ecl = ["%s().reserve_space(sw_obj_int_from_go_int(%d))" % (_gen_new_obj_func_name(_get_builtins_cls("dict"), 0), len(kvel))]
         for ek, ev in kvel:
             ecl.append(".%s(%d, (%s), (%s))" % (_gen_method_name("__setelem__", 2), mod.id, _gen_expr_code(ek), _gen_expr_code(ev)))
         return "".join(ecl)
@@ -468,7 +470,7 @@ def _output_simple_assign(code, lvalue, expr_or_expr_code):
         sub_lvalue_count = len(sub_lvalues)
         assert sub_lvalue_count > 0
         tmp_var_name = _gen_tmp_var_name()
-        code += ("var %s []sw_obj = %s((%s), sw_obj{iv: (%d)}).ov.(*%s).v" %
+        code += ("var %s []sw_obj = %s((%s), sw_obj_int_from_go_int(%d)).(*%s).v" %
                  (tmp_var_name, _gen_mod_elem_name(_get_builtins_func("_unpack_multi_value", 2)), expr_code, sub_lvalue_count,
                   _gen_mod_elem_name(_get_builtins_cls("list"))))
         for i, sub_lvalue in enumerate(sub_lvalues):
@@ -504,7 +506,37 @@ def _output_stmt_list(code, stmt_list):
             continue
 
         if stmt.type == "assign":
-            _output_simple_assign(code, stmt.lvalue, stmt.expr)
+            if stmt.sym == "=":
+                _output_simple_assign(code, stmt.lvalue, stmt.expr)
+            else:
+                assert stmt.lvalue.op not in ("[:]", "tuple") and stmt.sym.endswith("=")
+                aug_op = stmt.sym[: -1]
+                assert aug_op in _BINOCULAR_OP_2_INTERNAL_METHOD
+                imn = _BINOCULAR_OP_2_INTERNAL_METHOD[aug_op]
+                imn_expr_code = "%s(%d, (%s))" % (_gen_method_name("__i_%s__" % imn, 1), mod.id, _gen_expr_code(stmt.expr))
+                code.record_tb_info(stmt.lvalue.pos_info)
+                if stmt.lvalue.op == "[]":
+                    obj_expr, key_expr = stmt.lvalue.arg
+                    obj_tmp_var_name = _gen_tmp_var_name()
+                    code += "var %s sw_obj = (%s)" % (obj_tmp_var_name, _gen_expr_code(obj_expr))
+                    key_tmp_var_name = _gen_tmp_var_name()
+                    code.record_tb_info(stmt.lvalue.pos_info)
+                    code += "var %s sw_obj = (%s)" % (key_tmp_var_name, _gen_expr_code(key_expr))
+                    code.record_tb_info(stmt.lvalue.pos_info)
+                    code += ("%s.%s(%d, %s, %s.%s(%d, %s).%s)" %
+                             (obj_tmp_var_name, _gen_method_name("__setelem__", 2), mod.id, key_tmp_var_name, obj_tmp_var_name,
+                              _gen_method_name("__getelem__", 1), mod.id, key_tmp_var_name, imn_expr_code))
+                elif stmt.lvalue.op == ".":
+                    obj_expr, name = stmt.lvalue.arg
+                    tmp_var_name = _gen_tmp_var_name()
+                    code += "var %s sw_obj = (%s)" % (tmp_var_name, _gen_expr_code(obj_expr))
+                    code.record_tb_info(stmt.lvalue.pos_info)
+                    code += "%s.%s(%d, %s.%s(%d).%s)" % (tmp_var_name, _gen_set_attr_method_name(name), mod.id, tmp_var_name,
+                                                         _gen_get_attr_method_name(name), mod.id, imn_expr_code)
+                else:
+                    assert stmt.lvalue.op in ("gv", "lv", "this.attr")
+                    lvalue_code = _gen_expr_code(stmt.lvalue)
+                    code += "%s = %s.%s" % (lvalue_code, lvalue_code, imn_expr_code)
             continue
 
         if stmt.type == "expr":
@@ -567,11 +599,10 @@ def _output_stmt_list(code, stmt_list):
 
 def _output_func_obj_def(code, fo):
     arg_count = len(fo.arg_map)
-    with code.new_blk("var %s = sw_obj" % _gen_fo_name(fo)):
-        with code.new_blk("ov: &%s" % _gen_func_obj_stru_name(arg_count), tail = ","):
-            with code.new_blk("f: func (%s) sw_obj" % (_gen_arg_def(fo.arg_map)), start_with_blank_line = False, tail = ","):
-                _output_stmt_list(code, fo.stmt_list)
-                code += "return %s" % _gen_nil_literal()
+    with code.new_blk("var %s sw_obj = &%s" % (_gen_fo_name(fo), _gen_func_obj_stru_name(arg_count))):
+        with code.new_blk("f: func (%s) sw_obj" % (_gen_arg_def(fo.arg_map)), start_with_blank_line = False, tail = ","):
+            _output_stmt_list(code, fo.stmt_list)
+            code += "return %s" % _gen_nil_literal()
 
 def _output_attr_method_default(code, cls_stru_name, cls_type_name, attr_name):
     exc_code = _gen_internal_simple_exc("NoAttr", "‘%s’没有属性‘%s’" % (cls_type_name, attr_name))
@@ -607,7 +638,7 @@ def _output_method_default(code, cls_stru_name, cls_type_name, method_name, arg_
 
             if (simple_method_name, arg_count) == ("bool", 0):
                 #默认的bool为true
-                code += "return sw_obj{iv: 1}"
+                code += "return %s" % _gen_bool_literal(True)
                 return
 
             if simple_method_name.startswith("i_") and arg_count == 1:
@@ -642,14 +673,18 @@ def _output_mod():
             prefix = "literal_"
             assert t.is_literal and t.type.startswith(prefix)
             literal_type = t.type[len(prefix) :]
-            if literal_type in ("nil", "int"):
-                #这两个类型的字面量直接体现在目标代码中
+            if literal_type in ("nil", "bool"):
+                #这两个类型的字面量是全局唯一的，直接体现在目标代码中
                 continue
-            if literal_type == "str":
+            if literal_type == "int":
+                v = str(t.value)
+            elif literal_type == "float":
+                v = t.value.hex()
+            elif literal_type == "str":
                 v = _gen_str_literal(t.value)
             else:
                 swc_util.abort()
-            code += "var %s = sw_obj{ov: &%s{v: (%s)}}" % (_gen_literal_name(t), _gen_mod_elem_name(_get_builtins_cls(literal_type)), v)
+            code += "var %s sw_obj = &%s{v: (%s)}" % (_gen_literal_name(t), _gen_mod_elem_name(_get_builtins_cls(literal_type)), v)
 
         #全局变量定义
         code += ""
@@ -689,7 +724,7 @@ def _output_mod():
                 cls_name = _gen_cls_type_name(cls)
                 code += "return %s" % _gen_str_literal(cls_name)
             with code.new_blk("func (this *%s) addr() uint64" % sw_cls_name):
-                code += "return sw_util_obj_addr(sw_obj{ov: this})"
+                code += "return sw_util_obj_addr(this)"
 
             #属性的get和set方法
             for attr in cls.attr_map.itervalues():
@@ -728,12 +763,12 @@ def _output_mod():
             for arg_count in init_method_arg_count_set:
                 sw_new_obj_func_name = _gen_new_obj_func_name(cls, arg_count)
                 arg_name_list = [str(i) for i in xrange(arg_count)]
-                with code.new_blk("func %s(%s) sw_obj" % (sw_new_obj_func_name, _gen_arg_def(arg_name_list))):
+                with code.new_blk("func %s(%s) *%s" % (sw_new_obj_func_name, _gen_arg_def(arg_name_list), sw_cls_name)):
                     code += "o := new(%s)" % sw_cls_name
                     code.record_tb_info(_POS_INFO_IGNORE)
                     code += "o.%s(%s)" % (_gen_method_name("__init__", arg_count),
                                           ", ".join([str(mod.id)] + ["l_%s" % name for name in arg_name_list]))
-                    code += "return sw_obj{ov: o}"
+                    code += "return o"
 
             #补全其他属性的get和set
             for attr_name in [an for an in swc_mod.all_attr_name_set if an not in cls.attr_map]:
@@ -749,9 +784,6 @@ def _output_mod():
 
 def _output_util():
     with _Code("%s/%s.util.go" % (_out_prog_dir, _prog_pkg_name)) as code:
-        with code.new_blk("import"):
-            code += '"fmt"'
-
         #traceback信息
         with code.new_blk("var sw_util_tb_map = map[sw_util_go_tb]*sw_util_sw_tb"):
             for (go_file_name, go_line_no), tb_info in _tb_map.iteritems():
@@ -763,8 +795,8 @@ def _output_util():
                              (_gen_str_literal(go_file_name), go_line_no, _gen_str_literal(sw_file_name), sw_line_no,
                               _gen_str_literal(sw_fom_name)))
 
-        #sw_obj_intf的定义
-        with code.new_blk("type sw_obj_intf interface"):
+        #sw_obj的定义
+        with code.new_blk("type sw_obj interface"):
             code += "type_name() string"
             code += "addr() uint64"
             for name in swc_mod.all_attr_name_set:
@@ -772,69 +804,6 @@ def _output_util():
                 code += "%s(int64, sw_obj)" % (_gen_set_attr_method_name(name))
             for name, arg_count in _all_method_sign_set:
                 code += "%s(%s) sw_obj" % (_gen_method_name(name, arg_count), ", ".join(["int64"] + ["sw_obj"] * arg_count))
-
-        #sw_obj的方法定义
-        with code.new_blk("func (so sw_obj) type_name() string"):
-            with code.new_blk("if so.ov == nil"):
-                code += 'return "int"'
-            code += "return so.ov.type_name()"
-        with code.new_blk("func (so sw_obj) addr() uint64"):
-            with code.new_blk("if so.ov == nil"):
-                code += "return 0"
-            code += "return so.ov.addr()"
-        for name in swc_mod.all_attr_name_set:
-            exc_code = _gen_internal_simple_exc("NoAttr", "‘int’没有属性‘%s’" % name)
-            throw_exc_code = _gen_throw_exc(exc_code)
-            get_attr_mn = _gen_get_attr_method_name(name)
-            with code.new_blk("func (so sw_obj) %s(perm int64) sw_obj" % get_attr_mn):
-                with code.new_blk("if so.ov == nil"):
-                    code += throw_exc_code
-                code += "return so.ov.%s(perm)" % get_attr_mn
-            set_attr_mn = _gen_set_attr_method_name(name)
-            with code.new_blk("func (so sw_obj) %s(perm int64, v sw_obj)" % set_attr_mn):
-                with code.new_blk("if so.ov == nil"):
-                    code += throw_exc_code
-                code += "so.ov.%s(perm, v)" % set_attr_mn
-        for name, arg_count in _all_method_sign_set:
-            if name.startswith("__") and name.endswith("__"):
-                info = "没有实现内部方法"
-            else:
-                info = "没有方法"
-            exc_code = _gen_internal_simple_exc("NoMethod", "‘int’%s‘%s<%d>’" % (info, name, arg_count))
-            throw_exc_code = _gen_throw_exc(exc_code)
-            mn = _gen_method_name(name, arg_count)
-            arg_name_list = [str(i) for i in xrange(arg_count)]
-            with code.new_blk("func (so sw_obj) %s(%s) sw_obj" % (mn, _gen_arg_def(arg_name_list, need_perm_arg = True))):
-                with code.new_blk("if so.ov == nil"):
-                    if len(name) > 4 and name.startswith("__") and name.endswith("__"):
-                        simple_name = name[2 : -2]
-                        if simple_name in ("repr", "str") and arg_count == 0:
-                            code += 'return sw_obj_str_from_go_str(fmt.Sprintf("%d", so.iv))'
-                        elif simple_name == "bool" and arg_count == 0:
-                            code += "return so"
-                        elif simple_name in ("inv", "pos", "neg") and arg_count == 0:
-                            code += "return sw_obj{iv: %s(so.iv)}" % {"inv": "^", "pos": "+", "neg": "-"}[simple_name]
-                        elif (simple_name in ("lt", "eq", "add", "sub", "mul", "div", "mod", "shl", "shr", "and", "or", "xor") and
-                              arg_count == 1):
-                            if simple_name in ("lt", "eq"):
-                                op = {"lt": "<", "eq": "=="}[simple_name]
-                            else:
-                                op = _BINOCULAR_OP_INTERNAL_METHOD_2_OP[simple_name]
-                            with code.new_blk("if l_0.ov != nil"):
-                                code += ("%s(sw_obj_str_from_go_str(%s), so, l_0)" %
-                                         (_gen_mod_elem_name(_get_builtins_func("throw_unsupported_binocular_oper", 3)), _gen_str_literal(op)))
-                            if simple_name in ("lt", "eq"):
-                                with code.new_blk("if so.iv %s l_0.iv" % op):
-                                    code += "return sw_obj{iv: 1}"
-                                with code.new_blk("else"):
-                                    code += "return sw_obj{iv: 0}"
-                            else:
-                                code += "return sw_obj{iv: (so.iv %s %s(l_0.iv))}" % (op, "uint64" if simple_name in ("shl", "shr") else "")
-                        else:
-                            code += throw_exc_code
-                    else:
-                        code += throw_exc_code
-                code += "return so.ov.%s(%s)" % (mn, ", ".join(["perm"] + ["l_%s" % arg_name for arg_name in arg_name_list]))
 
         #所有函数对象类型的实现，就是针对所有出现的函数对象的参数数量，生成对应的匿名class实现
         for arg_count in swc_mod.func_obj_arg_count_set:
@@ -851,7 +820,7 @@ def _output_util():
             with code.new_blk("func (this *%s) type_name() string" % fo_stru_name):
                 code += "return %s" % _gen_str_literal(fo_name)
             with code.new_blk("func (this *%s) addr() uint64" % fo_stru_name):
-                code += "return sw_util_obj_addr(sw_obj{ov: this})"
+                code += "return sw_util_obj_addr(this)"
             #补全属性的get和set
             for attr_name in swc_mod.all_attr_name_set:
                 _output_attr_method_default(code, fo_stru_name, fo_name, attr_name)
