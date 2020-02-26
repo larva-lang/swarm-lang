@@ -182,7 +182,7 @@ class _ParseStk:
 
 def _is_expr_end(t):
     if t.is_sym:
-        if t.value in (set([")", "]", ",", ";", ":", "}"]) | swc_token.ASSIGN_SYM_SET):
+        if t.value in (")", "]", ",", ";", ":", "}", "="):
             return True
     return False
 

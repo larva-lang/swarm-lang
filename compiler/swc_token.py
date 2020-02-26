@@ -23,14 +23,13 @@ _TOKEN_RE = re.compile(
     #词，关键字或标识符
     r"""([a-zA-Z_]\w*)""")
 
-ASSIGN_SYM_SET = set(["="] + [_op + "=" for _op in ("%", "^", "&", "*", "-", "+", "|", "/", "<<", ">>")])
-BINOCULAR_OP_SYM_SET = set(["%", "^", "&", "*", "-", "+", "|", "<", ">", "/", "!=", "==", "<<", "<=", ">>", ">=", "&&", "||"]) #不含is
+BINOCULAR_OP_SYM_SET = set(["%", "^", "&", "*", "-", "+", "|", "<", ">", "/", "!=", "==", "!==", "===", "<<", "<=", ">>", ">=", "&&", "||"])
 
 #合法的符号集
-_SYM_SET = set("""~!(){}[]:;'",.""") | BINOCULAR_OP_SYM_SET | ASSIGN_SYM_SET
+_SYM_SET = set("""~!()={}[]:;'",.""") | BINOCULAR_OP_SYM_SET
 
-_RESERVED_WORD_SET = set(["import", "class", "func", "for", "while", "if", "else", "return", "nil", "true", "false", "break", "continue",
-                          "this", "public", "var", "defer", "final", "is", "isinstanceof"])
+_RESERVED_WORD_SET = set(["import", "class", "func", "for", "while", "if", "else", "return", "nil", "break", "continue", "this", "public",
+                          "var", "defer", "final", "isinstanceof", "int"])
 
 class _Token:
     def __init__(self, type, value, src_fn, line_idx, pos):
@@ -69,7 +68,7 @@ class _Token:
             def __nonzero__(self):
                 return self.token.type.startswith("literal_")
             def __call__(self, type):
-                assert type in ("nil", "bool", "int", "float", "str")
+                assert type in ("nil", "int", "float", "str")
                 return self and self.token.type == "literal_" + type
         self.is_literal = IsLiteral(self)
 
@@ -267,13 +266,13 @@ class Parser:
             if c == "\\":
                 #转义字符
                 if s == "":
-                    _syntax_err(self, "字符串在转义处结束")
+                    _syntax_err(self, "字符或字符串字面量在转义处结束")
                 c, consume_len = self._get_escape_char(s)
                 s = s[consume_len :]
                 self.pos += consume_len
             l.append(c) #添加到列表
         else:
-            _syntax_err(self, "字符串不完整")
+            _syntax_err(self, "字符或字符串字面量不完整")
 
         return "".join(l)
 
@@ -309,8 +308,12 @@ class Parser:
                     _syntax_err(self, "非法的符号%r" % sym)
 
                 if sym in ("'", '"'):
-                    #字符串，单独解析，并会自行调整pos
+                    #字符或字符串，单独解析，并会自行调整pos
                     value = self._parse_str(s)
+                    if sym == "'":
+                        if len(value) != 1:
+                            _syntax_err(self, "字符字面量必须包含一个字符")
+                        return _Token("literal_int", ord(value), self.src_fn, self.line_idx, token_pos)
                     return _Token("literal_str", value, self.src_fn, self.line_idx, token_pos)
 
                 #普通符号token
@@ -347,8 +350,6 @@ class Parser:
                 return _Token("literal_int", value, self.src_fn, self.line_idx, token_pos)
 
             if w is not None:
-                if w in ("true", "false"):
-                    return _Token("literal_bool", w, self.src_fn, self.line_idx, token_pos)
                 if w == "nil":
                     return _Token("literal_nil", w, self.src_fn, self.line_idx, token_pos)
                 return _Token("word", w, self.src_fn, self.line_idx, token_pos)

@@ -27,7 +27,7 @@ public class dict
     dirty   int64
     !>>
 
-    public func __init__()
+    public func __init__(kv_it)
     {
         !<<
         this.tbl = make([]*sw_obj_dict_node_stru, 1 << 3)
@@ -41,36 +41,35 @@ public class dict
         this.sz     = 0
         this.dirty  = 1
         !>>
-    }
 
-    public func __init__(kv_it)
-    {
-        this.__init__();
-        this.update(kv_it);
+        if (kv_it !== nil)
+        {
+            this.update(kv_it);
+        }
     }
 
     public func update(kv_it)
     {
-        for (var (k, v): kv_it)
+        for (var kv: kv_it)
         {
-            this[k] = v;
+            this.set(kv.get(0), kv.get(1));
         }
     }
 
-    public func __getelem__(k)
+    public func get(k)
     {
         //todo
         throw(NotImpl());
     }
 
-    public func __setelem__(k, v)
+    public func set(k, v)
     {
         //todo
         throw(NotImpl());
         return this;
     }
 
-    public func reserve_space(sz)
+    public func reserve_space(sz int)
     {
         //todo
         throw(NotImpl());

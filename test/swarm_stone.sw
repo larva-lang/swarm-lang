@@ -2,7 +2,12 @@ import time;
 
 class Record
 {
-    var ptr_comp, discr, enum_comp, int_comp, str_comp;
+    var ptr_comp,
+        discr       int,
+        enum_comp   int,
+        int_comp    int,
+        str_comp,
+    ;
 
     func assign(other)
     {
@@ -14,66 +19,82 @@ class Record
     }
 }
 
-final var (IDENT_0, IDENT_1, IDENT_2, IDENT_3, IDENT_4, IDENT_5) = (0, 1, 2, 3, 4, 5);
+final var
+    IDENT_0 = 0,
+    IDENT_1 = 1,
+    IDENT_2 = 2,
+    IDENT_3 = 3,
+    IDENT_4 = 4,
+    IDENT_5 = 5,
+;
+
 final var LOOPS = 50000;
 
-var (int_glob, bool_glob, char_1_glob, char_2_glob) = (0, false, 0, 0);
-var array_1_glob = [0] * 51;
-var array_2_glob = map(range(0, 51), func (i) {
-    return [0] * 51;
-});
-var (ptr_glob, ptr_glob_next) = (Record(), Record());
+var int_glob = 0,
+    bool_glob = 0,
+    char_1_glob = 0,
+    char_2_glob = 0,
+;
+var array_1_glob = [0].repeat(51),
+    array_2_glob = map(range(0, 51), func (i int) {
+        return [0].repeat(51);
+    }),
+;
+var ptr_glob = Record(),
+    ptr_glob_next = Record(),
+;
 
-func func_3(enum_par_in)
+func func_3(enum_par_in int) int
 {
     var enum_loc = enum_par_in;
     if (enum_loc == IDENT_3)
     {
-        return true;
+        return 1;
     }
     else
     {
-        return false;
+        return 0;
     }
 }
 
-func func_2(str_par_1, str_par_2)
+func func_2(str_par_1, str_par_2) int
 {
-    var (int_loc, char_loc) = (1, 0);
+    var int_loc = 1,
+        char_loc = 0;
     while (int_loc <= 1)
     {
-        if (func_1(str_par_1[int_loc], str_par_2[int_loc + 1]) == IDENT_1)
+        if (func_1(str_par_1.char_at(int_loc), str_par_2.char_at(int_loc + 1)) == IDENT_1)
         {
-            char_loc = 65;
-            int_loc += 1;
+            char_loc = 'A';
+            int_loc = int_loc + 1;
         }
     }
-    if (char_loc >= 87 && char_loc <= 90)
+    if (char_loc >= 'W' && char_loc <= 'Z')
     {
         int_loc = 7;
     }
-    if (char_loc == 88)
+    if (char_loc == 'X')
     {
-        return true;
+        return 1;
     }
     else
     {
-        if (str_par_1 > str_par_2)
+        if (str_par_1.cmp(str_par_2) > 0)
         {
-            int_loc += 7;
-            return true;
+            int_loc = int_loc + 7;
+            return 1;
         }
         else
         {
-            return false;
+            return 0;
         }
     }
 }
 
-func func_1(char_par_1, char_par_2)
+func func_1(char_par_1 int, char_par_2 int) int
 {
-    var char_loc_1 = char_par_1;
-    var char_loc_2 = char_loc_1;
+    var char_loc_1 = char_par_1,
+        char_loc_2 = char_loc_1;
     if (char_loc_2 != char_par_2)
     {
         return IDENT_1;
@@ -84,29 +105,30 @@ func func_1(char_par_1, char_par_2)
     }
 }
 
-func proc_8(array_1_par, array_2_par, int_par_1, int_par_2)
+func proc_8(array_1_par, array_2_par, int_par_1 int, int_par_2 int)
 {
     var int_loc = int_par_1 + 5;
-    array_1_par[int_loc] = int_par_2;
-    array_1_par[int_loc + 1] = array_1_par[int_loc];
-    array_1_par[int_loc + 30] = int_loc;
-    for (var int_idx: range(int_loc, int_loc + 2))
+    array_1_par.set(int_loc, int_par_2);
+    array_1_par.set(int_loc + 1, array_1_par.get(int_loc));
+    array_1_par.set(int_loc + 30, int_loc);
+    for (var int_idx int: range(int_loc, int_loc + 2))
     {
-        array_2_par[int_loc][int_idx] = int_loc;
+        array_2_par.get(int_loc).set(int_idx, int_loc);
     }
-    array_2_par[int_loc][int_loc - 1] += 1;
-    array_2_par[int_loc + 20][int_loc] = array_1_par[int_loc];
+    array_2_par.get(int_loc).set(int_loc - 1, array_2_par.get(int_loc).get(int_loc - 1) + 1);
+    array_2_par.get(int_loc + 20).set(int_loc, array_1_par.get(int_loc));
     int_glob = 5;
 }
 
-func proc_7(int_par_1, int_par_2)
+func proc_7(int_par_1 int, int_par_2 int) int
 {
-    var int_loc = int_par_1 + 2;
-    var int_par_out = int_par_2 + int_loc;
+    var int_loc = int_par_1 + 2,
+        int_par_out = int_par_2 + int_loc,
+    ;
     return int_par_out;
 }
 
-func proc_6(enum_par_in)
+func proc_6(enum_par_in int) int
 {
     var enum_par_out = enum_par_in;
     if (!func_3(enum_par_in))
@@ -144,20 +166,20 @@ func proc_6(enum_par_in)
 
 func proc_5()
 {
-    char_1_glob = 65;
-    bool_glob = false;
+    char_1_glob = 'A';
+    bool_glob = 0;
 }
 
 func proc_4()
 {
-    var bool_loc = char_1_glob == 65;
+    var bool_loc = char_1_glob == 'A';
     bool_loc = bool_loc || bool_glob;
-    char_2_glob = 66;
+    char_2_glob = 'B';
 }
 
 func proc_3(ptr_par_out)
 {
-    if (!(ptr_glob is nil))
+    if (ptr_glob !== nil)
     {
         ptr_par_out = ptr_glob.ptr_comp;
     }
@@ -169,15 +191,16 @@ func proc_3(ptr_par_out)
     return ptr_par_out;
 }
 
-func proc_2(int_ptr_io)
+func proc_2(int_ptr_io int) int
 {
-    var int_loc = int_ptr_io + 10;
-    var enum_loc = IDENT_0;
-    while (true)
+    var int_loc = int_ptr_io + 10,
+        enum_loc = IDENT_0,
+    ;
+    while (1)
     {
-        if (char_1_glob == 65)
+        if (char_1_glob == 'A')
         {
-            int_loc -= 1;
+            int_loc = int_loc - 1;
             int_ptr_io = int_loc - int_glob;
             enum_loc = IDENT_1;
         }
@@ -223,14 +246,18 @@ func proc_0()
 
     var str_1_loc = "DHRYSTONE PROGRAM, 1'ST STRING";
 
-    array_2_glob[8][7] = 10;
+    array_2_glob.get(8).set(7, 10);
 
-    for (var i: range(0, LOOPS))
+    for (var i int: range(0, LOOPS))
     {
         proc_5();
         proc_4();
 
-        var (int_loc_1, int_loc_2, str_2_loc, enum_loc) = (2, 3, "DHRYSTONE PROGRAM, 2'ND STRING", IDENT_2);
+        var int_loc_1 = 2,
+            int_loc_2 = 3,
+            str_2_loc = "DHRYSTONE PROGRAM, 2'ND STRING",
+            enum_loc = IDENT_2,
+        ;
 
         bool_glob = !func_2(str_1_loc, str_2_loc);
 
@@ -239,14 +266,14 @@ func proc_0()
         {
             int_loc_3 = 5 * int_loc_1 - int_loc_2;
             int_loc_3 = proc_7(int_loc_1, int_loc_2);
-            int_loc_1 += 1;
+            int_loc_1 = int_loc_1 + 1;
         }
         proc_8(array_1_glob, array_2_glob, int_loc_1, int_loc_3);
         proc_1(ptr_glob);
 
-        for (var char_idx: range(65, char_2_glob + 1))
+        for (var char_idx int: range('A', char_2_glob + 1))
         {
-            if (enum_loc == func_1(char_idx, 67))
+            if (enum_loc == func_1(char_idx, 'C'))
             {
                 enum_loc = proc_6(IDENT_1);
             }
@@ -262,7 +289,7 @@ public func main()
 {
     var ts = time.time();
     proc_0();
-    var tm = time.time() - ts;
+    var tm = time.time().sub(ts);
     println("Time used: %s sec".(tm));
-    println("This machine benchmarks at %s SwarmStones/second".(LOOPS / tm));
+    println("This machine benchmarks at %s SwarmStones/second".(float(LOOPS).div(tm)));
 }

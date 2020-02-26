@@ -138,8 +138,8 @@ class Parser:
             if sym == ";":
                 stmt_list.append(_Stmt("expr", expr = expr))
                 continue
-            if sym not in swc_token.ASSIGN_SYM_SET:
-                t.syntax_err("需要‘;’或赋值")
+            if sym != "=":
+                t.syntax_err("需要‘;’或‘=’")
 
             lvalue = expr
             if not lvalue.is_lvalue:

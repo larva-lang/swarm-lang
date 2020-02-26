@@ -20,7 +20,7 @@ class _Array
 
     public func __repr__()
     {
-        var (start, end);
+        var start, end;
         if (isinstanceof(this, tuple))
         {
             start   = "(";
@@ -38,7 +38,7 @@ class _Array
 
         if (this.size() == 0)
         {
-            return start + end;
+            return start.concat(end);
         }
 
         var l = [start];
@@ -47,31 +47,25 @@ class _Array
             l.append(repr(i));
             l.append(", ");
         }
-        l[-1] = end;
+        l.set(l.size() - 1, end);
         return "".join(l);
     }
 
-    public func __bool__()
+    public func get(idx int)
     {
-        return this.size() != 0;
-    }
-
-    public func __getelem__(idx)
-    {
-        var real_idx = _make_array_real_idx("%T".(this), idx, this.size());
+        _throw_on_idx_err(idx, this.size());
         !<<
-        i := l_real_idx.(*sw_cls_@<<:int>>).v
-        return this.v[i]
+        return this.v[l_idx]
         !>>
     }
 
-    public func __getslice__(bi, ei)
+    public func slice(bi int, ei int)
     {
-        (bi, ei) = _make_array_real_slice_range("%T".(this), bi, ei, this.size());
+        var sz = this.size();
+        _throw_on_idx_err(bi, sz);
+        _throw_on_idx_err(ei, sz);
         !<<
-        b := l_bi.(*sw_cls_@<<:int>>).v
-        e := l_ei.(*sw_cls_@<<:int>>).v
-        s := this.v[b : e]
+        s := this.v[l_bi : l_ei]
         !>>
         if (isinstanceof(this, tuple))
         {
@@ -91,19 +85,25 @@ class _Array
         }
     }
 
-    public func _cmp_oper(op, other)
+    public func _cmp_oper(op, other) int
     {
-        var do_cmp = func () {
-            var (this_sz, other_sz) = (this.size(), other.size());
-            if (op == "==" && this_sz != other_sz)
+        var op_is_lt = op.eq("<").int,
+            op_is_eq = !op_is_lt,
+        ;
+
+        var do_cmp = func () int {
+            var this_sz     = this.size(),
+                other_sz    = other.size().int,
+            ;
+            if (op_is_eq && this_sz != other_sz)
             {
-                return false;
+                return 0;
             }
             for (var i: range(0, min(this_sz, other_sz)))
             {
-                if ((op == "<" && this[i] >= other[i]) || (op == "==" && this[i] != other[i]))
+                if ((op_is_lt && this.get(i).cmp(other.get(i)) >= 0) || (op_is_eq && !this.get(i).eq(other.get(i)).int))
                 {
-                    return false;
+                    return 0;
                 }
             }
             return this_sz <= other_sz;
@@ -131,21 +131,17 @@ class _Array
         throw_unsupported_binocular_oper(op, this, other);
     }
 
-    public func __lt__(other)
+    public func lt(other) int
     {
         return this._cmp_oper("<", other);
     }
 
-    public func __eq__(other)
+    public func eq(other) int
     {
         return this._cmp_oper("==", other);
     }
 
-    public func __add__(other)
-    {
-        //todo
-        throw(NotImpl());
-    }
+    //todo below
 
     public func __mul__(other)
     {
@@ -185,14 +181,14 @@ class _Array
         throw_unsupported_binocular_oper("*", this, other);
     }
 
-    public func size()
+    public func size() int
     {
         !<<
-        return sw_obj_int_from_go_int(int64(len(this.v)))
+        return sw_cls_int(int64(len(this.v)))
         !>>
     }
 
-    public func has(x)
+    public func has(x) int
     {
         //todo
         throw(NotImpl());
@@ -223,50 +219,12 @@ class _ArrayIter
     }
 }
 
-func _make_array_real_idx(type_name, idx, sz)
+func _throw_on_idx_err(idx int, sz int)
 {
-    if (!isinstanceof(idx, int))
-    {
-        throw(TypeError("%s[x]的下标需要是int类型".(type_name)));
-    }
-    var real_idx = idx + sz if idx < 0 else idx;
-    if (real_idx < 0 || real_idx >= sz)
+    if (idx < 0 || idx >= sz)
     {
         throw(IndexError(idx, sz));
     }
-    return real_idx;
-}
-
-func _make_array_real_slice_range(type_name, bi, ei, sz)
-{
-    if (bi is nil)
-    {
-        bi = 0;
-    }
-    if (ei is nil)
-    {
-        ei = sz;
-    }
-
-    if (!(isinstanceof(bi, int) && isinstanceof(ei, int)))
-    {
-        throw(TypeError("%s[x:y]的两个下标需要是nil或int对象".(type_name)));
-    }
-
-    var fix_idx = func (i) {
-        if (i < 0)
-        {
-            i += sz;
-        }
-        return min(max(0, i), sz);
-    };
-    bi = fix_idx.call(bi);
-    ei = fix_idx.call(ei);
-    if (bi > ei)
-    {
-        ei = bi;
-    }
-    return (bi, ei);
 }
 
 !<<
