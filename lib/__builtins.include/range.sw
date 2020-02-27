@@ -1,14 +1,14 @@
 public class range
 {
-    var curr, end;
+    var curr int, end int;
 
-    public func __init__(begin, end)
+    public func __init__(begin int, end int)
     {
         this.curr   = begin;
         this.end    = end;
     }
 
-    public func __bool__()
+    public func is_valid() int
     {
         return this.curr < this.end;
     }
@@ -18,10 +18,10 @@ public class range
         return this;
     }
 
-    public func next()
+    public func next() int
     {
         var ret = this.curr;
-        this.curr += 1;
+        this.curr = this.curr + 1;
         return ret;
     }
 }

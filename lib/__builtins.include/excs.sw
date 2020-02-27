@@ -38,22 +38,6 @@ class _EmptyException
     }
 }
 
-public class DivByZeroError(_EmptyException)
-{
-    public func __str__()
-    {
-        return "被零除";
-    }
-}
-
-public class ShiftByNegError(_EmptyException)
-{
-    public func __str__()
-    {
-        return "移位数量为负";
-    }
-}
-
 public class NotImpl(_EmptyException)
 {
     public func __str__()
@@ -64,32 +48,16 @@ public class NotImpl(_EmptyException)
 
 public class IndexError
 {
-    var idx, sz;
+    var idx int, sz int;
 
-    public func __init__(idx, sz)
+    public func __init__(idx int, sz int)
     {
-        if (!(isinstanceof(idx, int) && isinstanceof(sz, int)))
-        {
-            throw(TypeError("IndexError(idx, sz)的参数需要是两个int"));
-        }
         this.idx    = idx;
         this.sz     = sz;
     }
 
     public func __str__()
     {
-        return "索引%d在范围[0, %d)之外".(this.idx, this.sz);
+        return "索引%s在范围[0, %s)之外".(this.idx, this.sz);
     }
-}
-
-public class NoPerm(_Exception)
-{
-}
-
-public class NoAttr(_Exception)
-{
-}
-
-public class NoMethod(_Exception)
-{
 }

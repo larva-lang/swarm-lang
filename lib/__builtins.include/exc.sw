@@ -14,14 +14,14 @@ public func rethrow(exc, tb)
     !<<
     panic(&sw_exc_stru_catched{
         exc:    l_exc,
-        tb:     l_tb.(*sw_cls_@<<:str>>).v,
+        tb:     sw_obj_str_to_go_str(l_tb),
     })
     !>>
 }
 
 public func handle_exc(handler)
 {
-    var (exc, tb);
+    var exc, tb;
 
     !<<
     c := sw_exc_recovered_to_catched(recover())
@@ -35,7 +35,7 @@ public func handle_exc(handler)
 
 public func call_and_catch(f)
 {
-    var (exc, tb);
+    var exc, tb;
     func () {
         defer handle_exc(func (_exc, _tb) {
             exc = _exc;

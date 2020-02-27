@@ -2,7 +2,7 @@ public class tuple(_Array)
 {
     //todo
 
-    public func hash()
+    public func hash() int
     {
         //todo
         throw(NotImpl());

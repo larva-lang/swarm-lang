@@ -99,7 +99,7 @@ class _Array
             {
                 return 0;
             }
-            for (var i: range(0, min(this_sz, other_sz)))
+            for (var i: range(0, this_sz if this_sz < other_sz else other_sz))
             {
                 if ((op_is_lt && this.get(i).cmp(other.get(i)) >= 0) || (op_is_eq && !this.get(i).eq(other.get(i)).int))
                 {
@@ -141,44 +141,32 @@ class _Array
         return this._cmp_oper("==", other);
     }
 
-    //todo below
-
-    public func __mul__(other)
+    public func repeat(count int)
     {
-        if (isinstanceof(other, int))
+        var this_sz = this.size();
+        _throw_on_repeat_count_err(count, this_sz);
+        !<<
+        new_s := make([]sw_obj, 0, l_this_sz * l_count)
+        for i := sw_cls_int(0); i < l_count; i ++ {
+            new_s = append(new_s, this.v...)
+        }
+        !>>
+        if (isinstanceof(this, tuple))
         {
             !<<
-            this_len    := int64(len(this.v))
-            count       := l_other.(*sw_cls_@<<:int>>).v
-            if count < 0 || (count > 0 && this_len * count / count != this_len) {
+            return sw_obj_tuple_from_go_slice(new_s, false)
             !>>
-                throw(ValueError("‘%T*count’运算参数错误，count=%d，容器大小=%d".(this, other, this.size())));
-            !<<
-            }
-            new_s := make([]sw_obj, 0, this_len * count)
-            for i := int64(0); i < count; i ++ {
-                new_s = append(new_s, this.v...)
-            }
-            !>>
-            if (isinstanceof(this, tuple))
-            {
-                !<<
-                return sw_obj_tuple_from_go_slice(new_s, false)
-                !>>
-            }
-            else if (isinstanceof(this, list))
-            {
-                !<<
-                return sw_obj_list_from_go_slice(new_s, false)
-                !>>
-            }
-            else
-            {
-                abort("bug");
-            }
         }
-
-        throw_unsupported_binocular_oper("*", this, other);
+        else if (isinstanceof(this, list))
+        {
+            !<<
+            return sw_obj_list_from_go_slice(new_s, false)
+            !>>
+        }
+        else
+        {
+            abort("bug");
+        }
     }
 
     public func size() int
@@ -198,7 +186,7 @@ class _Array
 //用于tuple和list的迭代器的扩展源
 class _ArrayIter
 {
-    var a, curr_idx;
+    var a, curr_idx int;
 
     func __init__(a)
     {
@@ -206,15 +194,15 @@ class _ArrayIter
         this.curr_idx   = 0;
     }
 
-    public func __bool__()
+    public func is_valid() int
     {
-        return this.curr_idx < this.a.size();
+        return this.curr_idx < this.a.size().int;
     }
 
     public func next()
     {
-        var curr = this.a[this.curr_idx];
-        this.curr_idx += 1;
+        var curr = this.a.get(this.curr_idx);
+        this.curr_idx = this.curr_idx + 1;
         return curr;
     }
 }
@@ -224,6 +212,14 @@ func _throw_on_idx_err(idx int, sz int)
     if (idx < 0 || idx >= sz)
     {
         throw(IndexError(idx, sz));
+    }
+}
+
+func _throw_on_repeat_count_err(count int, sz int)
+{
+    if (count < 0 || (count > 0 && sz * count / count != sz))
+    {
+        throw(ValueError("‘repeat’方法的count错误，count=%s，当前大小大小=%s".(count, sz)));
     }
 }
 

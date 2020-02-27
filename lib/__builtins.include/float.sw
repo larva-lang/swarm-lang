@@ -9,7 +9,7 @@ public class float
         if (isinstanceof(x, str))
         {
             !<<
-            s := l_x.(*sw_cls_@<<:str>>).v
+            s := sw_obj_str_to_go_str(l_x)
             v, err := strconv.ParseFloat(s, 64)
             if err != nil {
             !>>
@@ -32,7 +32,7 @@ public class float
         if (isinstanceof(x, int))
         {
             !<<
-            this.v = float64(l_x.(*sw_cls_@<<:int>>).v)
+            this.v = float64(l_x.(sw_cls_int))
             !>>
             return;
         }
@@ -42,49 +42,40 @@ public class float
 
     public func __repr__()
     {
-        return "%g".(this);
-    }
-
-    public func __bool__()
-    {
-        return this != 0.0;
-    }
-
-    func _cmp_oper(op, other)
-    {
         !<<
-        if v, ok := sw_obj_number_to_go_float(l_other); ok {
-            var result bool
-            switch l_op.(*sw_cls_@<<:str>>).v {
-            case "<":
-                result = this.v < v
-            case "==":
-                result = this.v == v
-            default:
-                panic("bug")
-            }
-            return sw_obj_bool_from_go_bool(result)
-        }
+        return sw_obj_str_from_go_str(fmt.Sprintf("%g", this.v))
         !>>
-        throw_unsupported_binocular_oper(op, this, other);
     }
 
-    public func __lt__(other)
+    public func cmp(other) int
     {
-        return this._cmp_oper("<", other);
+        if (isinstanceof(other, float))
+        {
+            !<<
+            other_v := l_other.(*sw_cls_@<<:float>>).v
+            if this.v < other_v {
+                return sw_cls_int(-1)
+            } else if this.v > other_v {
+                return sw_cls_int(1)
+            } else {
+                return sw_cls_int(0)
+            }
+            !>>
+        }
+        throw_unsupported_binocular_oper("比较", this, other);
     }
 
-    public func __eq__(other)
+    public func eq(other) int
     {
-        return this._cmp_oper("==", other);
+        return this.cmp(other) == 0;
     }
 
     func _arithmetic_binocular_oper(op, other)
     {
         !<<
-        if v, ok := sw_obj_number_to_go_float(l_other); ok {
+        if v, ok := l_other.(*sw_cls_@<<:float>>).v; ok {
             var result float64
-            switch l_op.(*sw_cls_@<<:str>>).v {
+            switch sw_obj_str_to_go_str(l_op) {
             case "+":
                 result = this.v + v
             case "-":
@@ -104,33 +95,28 @@ public class float
         throw_unsupported_binocular_oper(op, this, other);
     }
 
-    public func __add__(other)
+    public func add(other)
     {
         return this._arithmetic_binocular_oper("+", other);
     }
-    public func __sub__(other)
+    public func sub(other)
     {
         return this._arithmetic_binocular_oper("-", other);
     }
-    public func __mul__(other)
+    public func mul(other)
     {
         return this._arithmetic_binocular_oper("*", other);
     }
-    public func __div__(other)
+    public func div(other)
     {
         return this._arithmetic_binocular_oper("/", other);
     }
-    public func __mod__(other)
+    public func mod(other)
     {
         return this._arithmetic_binocular_oper("%", other);
     }
 
-    public func __pos__()
-    {
-        return this;
-    }
-
-    public func __neg__()
+    public func neg()
     {
         !<<
         return sw_obj_float_from_go_float(-this.v)
@@ -143,17 +129,6 @@ public class float
 func sw_obj_float_from_go_float(f float64) *sw_cls_@<<:float>> {
     return &sw_cls_@<<:float>>{
         v:  f,
-    }
-}
-
-func sw_obj_number_to_go_float(x sw_obj) (v float64, ok bool) {
-    switch o := x.(type) {
-    case *sw_cls_@<<:int>>:
-        return float64(o.v), true
-    case *sw_cls_@<<:float>>:
-        return o.v, true
-    default:
-        return 0, false
     }
 }
 

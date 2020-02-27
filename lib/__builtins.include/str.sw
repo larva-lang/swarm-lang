@@ -1,11 +1,11 @@
 func _to_str(method, x)
 {
     var s;
-    if (method == "str")
+    if (method.eq("str"))
     {
         s = x.__str__();
     }
-    else if (method == "repr")
+    else if (method.eq("repr"))
     {
         s = x.__repr__();
     }
@@ -35,7 +35,7 @@ public class str
     {
         var s = _to_str("str", x);
         !<<
-        this.v = l_s.(*sw_cls_@<<:str>>).v
+        this.v = sw_obj_str_to_go_str(l_s)
         !>>
     }
 
@@ -51,101 +51,87 @@ public class str
         return this;
     }
 
-    public func __bool__()
+    public func char_at(idx int) int
     {
-        return this.len() != 0;
-    }
-
-    public func __getelem__(idx)
-    {
-        var real_idx = _make_array_real_idx("str", idx, this.len());
+        _throw_on_idx_err(idx, this.len());
         !<<
-        i := l_real_idx.(*sw_cls_@<<:int>>).v
-        return sw_obj_str_from_go_str(this.v[i : i + 1])
+        return sw_cls_int(this.v[l_idx])
         !>>
     }
 
-    public func __getslice__(bi, ei)
+    public func sub_str(bi int, ei int)
     {
-        (bi, ei) = _make_array_real_slice_range("str", bi, ei, this.len());
+        var this_len = this.len();
+        _throw_on_idx_err(bi, this_len);
+        _throw_on_idx_err(ei, this_len);
         !<<
-        b := l_bi.(*sw_cls_@<<:int>>).v
-        e := l_ei.(*sw_cls_@<<:int>>).v
-        return sw_obj_str_from_go_str(this.v[b : e])
+        return sw_obj_str_from_go_str(this.v[l_bi : l_ei])
         !>>
     }
 
-    func _cmp_oper(op, other)
+    public func cmp(other) int
     {
         if (isinstanceof(other, str))
         {
             !<<
-            v := l_other.(*sw_cls_@<<:str>>).v
-            var result bool
-            switch l_op.(*sw_cls_@<<:str>>).v {
-            case "<":
-                result = this.v < v
-            case "==":
-                result = this.v == v
-            default:
-                panic("bug")
+            v := sw_obj_str_to_go_str(l_other)
+            if this.v < other.v {
+                return sw_cls_int(-1)
+            } else if this.v > other.v {
+                return sw_cls_int(1)
+            } else {
+                return sw_cls_int(0)
             }
-            return sw_obj_bool_from_go_bool(result)
             !>>
         }
-
-        throw_unsupported_binocular_oper(op, this, other);
+        throw_unsupported_binocular_oper("比较", this, other);
     }
 
-    public func __lt__(other)
-    {
-        return this._cmp_oper("<", other);
-    }
-
-    public func __eq__(other)
-    {
-        return this._cmp_oper("==", other);
-    }
-
-    public func __add__(other)
+    public func eq(other) int
     {
         if (isinstanceof(other, str))
         {
             !<<
-            return sw_obj_str_from_go_str(this.v + l_other.(*sw_cls_@<<:str>>).v)
+            v := sw_obj_str_to_go_str(l_other)
+            if this.v == other.v {
+                return sw_cls_int(1)
+            } else {
+                return sw_cls_int(0)
+            }
             !>>
         }
-
-        throw_unsupported_binocular_oper("+", this, other);
+        throw_unsupported_binocular_oper("判等", this, other);
     }
 
-    public func __mul__(other)
+    public func concat(other)
     {
-        if (isinstanceof(other, int))
+        if (isinstanceof(other, str))
         {
             !<<
-            this_len    := int64(len(this.v))
-            count       := l_other.(*sw_cls_@<<:int>>).v
-            if count < 0 || (count > 0 && this_len * count / count != this_len) {
-            !>>
-                throw(ValueError("‘str*count’运算参数错误，count=%d，字符串长度=%d".(other, this.len())));
-            !<<
-            }
-            return sw_obj_str_from_go_str(strings.Repeat(this.v, int(count)))
+            return sw_obj_str_from_go_str(this.v + sw_obj_str_to_go_str(l_other))
             !>>
         }
 
-        throw_unsupported_binocular_oper("*", this, other);
+        throw_unsupported_binocular_oper("连接", this, other);
     }
 
-    public func len()
+    public func repeat(count int)
     {
+        var this_len = this.len();
+        _throw_on_repeat_count_err(count, this_len);
         !<<
-        return sw_obj_int_from_go_int(int64(len(this.v)))
+        return sw_obj_str_from_go_str(strings.Repeat(this.v, int(l_count)))
         !>>
     }
 
-    public func has(s)
+    public func len() int
+    {
+        !<<
+        return sw_cls_int(int64(len(this.v)))
+        !>>
+    }
+
+    public func has(s) int
     {
         if (!isinstanceof(s, str))
         {
@@ -153,20 +139,16 @@ public class str
         }
 
         !<<
-        v := l_s.(*sw_cls_@<<:str>>).v
+        v := sw_obj_str_to_go_str(l_s)
         if strings.Contains(this.v, v) {
-        !>>
-            return true;
-        !<<
+            return sw_cls_int(1)
         } else {
-        !>>
-            return false;
-        !<<
+            return sw_cls_int(0)
         }
         !>>
     }
 
-    public func hash()
+    public func hash() int
     {
         //todo
         throw(NotImpl());
@@ -184,7 +166,7 @@ public class str
                 throw(TypeError("str.join(iterable)的参数的迭代元素必须是字符串"));
             }
             !<<
-            sl = append(sl, l_s.(*sw_cls_@<<:str>>).v)
+            sl = append(sl, sw_obj_str_to_go_str(l_s))
             !>>
         }
         !<<
@@ -204,6 +186,10 @@ func sw_obj_str_from_go_str(s string) *sw_cls_@<<:str>> {
 func sw_obj_to_go_str(obj sw_obj) string {
     //直接构造str对象并返回其内部value
     return sw_new_obj_sw_cls_@<<:str>>_1(obj).v
+}
+
+func sw_obj_str_to_go_str(x sw_obj) string {
+    return x.(*sw_cls_@<<:str>>).v
 }
 
 !>>

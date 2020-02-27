@@ -1,34 +1,26 @@
 public class list(_Array)
 {
-    //todo
-
-    public func __setelem__(idx, x)
+    public func set(idx int, x)
     {
-        var real_idx = _make_array_real_idx("list", idx, this.size());
+        _throw_on_idx_err(idx, this.size());
         !<<
-        i := l_real_idx.(*sw_cls_@<<:int>>).v
-        this.v[i] = l_x
+        this.v[l_idx] = l_x
         !>>
     }
 
-    public func __setslice__(bi, ei, it)
+    public func clear()
     {
-        (bi, ei) = _make_array_real_slice_range("list", bi, ei, this.size());
-        var l = list(it);
-        //todo
-        throw(NotImpl());
+        !<<
+        this.v = this.v[: 0]
+        !>>
+        return this;
     }
 
-    public func __iadd__(other)
+    public func extend(other)
     {
         //todo
         throw(NotImpl());
-    }
-
-    public func __imul__(other)
-    {
-        //todo
-        throw(NotImpl());
+        return this;
     }
 
     public func append(e)
@@ -41,17 +33,11 @@ public class list(_Array)
 
     public func pop(idx)
     {
-        var real_idx = _make_array_real_idx("list", idx, this.size());
+        _throw_on_idx_err(idx, this.size());
         !<<
-        i := l_real_idx.(*sw_cls_@<<:int>>).v
-        this.v = append(this.v[: i], this.v[i + 1 :]...)
+        this.v = append(this.v[: l_idx], this.v[l_idx + 1 :]...)
         !>>
         return this;
-    }
-
-    public func pop()
-    {
-        return this.pop(-1);
     }
 
     public func iter()
