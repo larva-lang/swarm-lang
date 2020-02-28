@@ -28,10 +28,7 @@ internal_method_sign_set    = _make_internal_method_sign_set()  #用于存储所
 
 def parse_var_name_def(token_list):
     t, name = token_list.pop_name()
-    if token_list.peek().is_reserved("int"):
-        tp = swc_type.Type(token_list.pop(), True)
-    else:
-        tp = swc_type.Type(t, False)
+    tp = swc_type.parse_type(t, token_list)
     return t, name, tp
 
 def _parse_decr_set(token_list):
@@ -229,7 +226,7 @@ class _Cls(_ModElem):
             if t.is_reserved("var"):
                 #属性定义
                 def parse_single_attr():
-                    t, name, tp = parse_var_name_def()
+                    t, name, tp = parse_var_name_def(token_list)
                     if name.startswith("__") and name.endswith("__"):
                         t.syntax_err("属性不能使用内建方法名的样式")
                     self._check_redefine(t, name)
@@ -243,10 +240,7 @@ class _Cls(_ModElem):
                 token_list.pop_sym("(")
                 arg_map = _parse_arg_map(token_list)
                 self._check_redefine(t, name)
-                if token_list.peek().is_reserved("int"):
-                    tp = swc_type.Type(token_list.pop(), True)
-                else:
-                    tp = swc_type.Type(t, False)
+                tp = swc_type.parse_type(t, token_list)
                 token_list.pop_sym("{")
                 block_token_list, sym = swc_token.parse_token_list_until_sym(token_list, ("}",))
                 assert sym == "}"
@@ -364,7 +358,7 @@ class _Gv(_ModElem):
             self.expr_token_list.pop_sym(";")
             assert not self.expr_token_list
             if self.expr.tp.is_int and not self.tp.is_int:
-                self.tp = swc_type.Type(self.tp.token, True)
+                self.tp = self.tp.to_int_type()
         del self.expr_token_list
 
 class Mod:
@@ -498,10 +492,7 @@ class Mod:
         self._check_redefine(t, name)
         token_list.pop_sym("(")
         arg_map = _parse_arg_map(token_list)
-        if token_list.peek().is_reserved("int"):
-            tp = swc_type.Type(token_list.pop(), True)
-        else:
-            tp = swc_type.Type(t, False)
+        tp = swc_type.parse_type(t, token_list)
         token_list.pop_sym("{")
         block_token_list, sym = swc_token.parse_token_list_until_sym(token_list, ("}",))
         assert sym == "}"

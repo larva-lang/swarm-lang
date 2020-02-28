@@ -1,6 +1,6 @@
 #coding=utf8
 
-import swc_util, swc_expr, swc_mod, swc_token
+import swc_util, swc_expr, swc_mod, swc_token, swc_type
 
 class _Stmt:
     def __init__(self, type, **kw_arg):
@@ -47,7 +47,7 @@ class Parser:
 
             if t.is_reserved("return"):
                 if self.token_list.peek().is_sym(";"):
-                    stmt = _Stmt("return_nil")
+                    stmt = _Stmt("return_default")
                 else:
                     stmt = _Stmt("return", expr = self.expr_parser.parse(var_map_stk))
                 stmt_list.append(stmt)
@@ -55,12 +55,12 @@ class Parser:
                 continue
 
             if t.is_reserved("for"):
-                for_var_map, for_var_def, iter_expr = self._parse_for_prefix(var_map_stk)
+                for_var_map, iter_expr = self._parse_for_prefix(var_map_stk)
+                assert len(for_var_map) == 1
                 self.token_list.pop_sym("{")
                 for_stmt_list = self.parse(var_map_stk + (for_var_map, swc_util.OrderedDict()), loop_deep + 1)
                 self.token_list.pop_sym("}")
-                stmt_list.append(
-                    _Stmt("for", for_var_map = for_var_map, for_var_def = for_var_def, iter_expr = iter_expr, stmt_list = for_stmt_list))
+                stmt_list.append(_Stmt("for", for_var_map = for_var_map, iter_expr = iter_expr, stmt_list = for_stmt_list))
                 continue
 
             if t.is_reserved("while"):
@@ -102,17 +102,18 @@ class Parser:
                 continue
 
             if t.is_reserved("var"):
-                var_def = swc_expr.parse_var_def(self.token_list)
-                self._add_lv(var_def, var_map_stk)
-                t, sym = self.token_list.pop_sym()
-                if sym == ";":
-                    init_expr = None
-                elif sym == "=":
-                    init_expr = self.expr_parser.parse(var_map_stk)
-                    self.token_list.pop_sym(";")
-                else:
-                    t.syntax_err("需要‘;’或‘=’")
-                stmt_list.append(_Stmt("var_def", var_def = var_def, init_expr = init_expr))
+                def parse_single_lv():
+                    t, name, tp = parse_var_name_def(self.token_list)
+                    self._add_lv(name, tp, var_map_stk)
+                    if self.token_list.peek().is_sym("="):
+                        token_list.pop_sym("=")
+                        init_expr = self.expr_parser.parse(var_map_stk)
+                        if init_expr.tp.is_int and not tp.is_int:
+                            var_map_stk[-1][name] = tp.to_int_type()
+                    else:
+                        init_expr = None
+                    stmt_list.append(_Stmt("var_def", name = name, tp = tp, init_expr = init_expr))
+                swc_util.parse_items(self.token_list, parse_single_lv, ";")
                 continue
 
             if t.is_reserved("defer"):
@@ -144,14 +145,13 @@ class Parser:
             lvalue = expr
             if not lvalue.is_lvalue:
                 expr_token.syntax_err("需要左值")
-            if sym != "=" and lvalue.op in ("[:]", "tuple"):
-                expr_token.syntax_err("不能对切片或多左值进行增量赋值")
+            if lvalue.op == "gv":
+                gv = lvalue.arg
+                if gv.is_final:
+                    expr_token.syntax_err("不能对final修饰的全局变量‘%s’赋值" % gv)
             expr = self.expr_parser.parse(var_map_stk)
             self.token_list.pop_sym(";")
-            final_gv = lvalue.get_final_gv()
-            if final_gv is not None:
-                expr_token.syntax_err("不能对final修饰的全局变量‘%s’赋值" % final_gv)
-            stmt_list.append(_Stmt("assign", lvalue = lvalue, sym = sym, expr = expr))
+            stmt_list.append(_Stmt("assign", lvalue = lvalue, expr = expr))
 
     def def_func_obj(self, func_obj):
         self.stmt_list_stk[-1].append(_Stmt("def_func_obj", func_obj = func_obj))
@@ -161,20 +161,19 @@ class Parser:
         t = self.token_list.pop()
         if not t.is_reserved("var"):
             t.syntax_err("需要‘var’")
+        t, name, tp = swc_mod.parse_var_name_def(self.token_list)
         for_var_map = swc_util.OrderedDict()
-        var_def = swc_expr.parse_var_def(self.token_list)
-        self._add_lv(var_def, var_map_stk + (for_var_map,))
+        self._add_lv(name, tp, var_map_stk + (for_var_map,))
         self.token_list.pop_sym(":")
         iter_expr = self.expr_parser.parse(var_map_stk) #iter_expr不能用for_var_map的变量
         self.token_list.pop_sym(")")
-        return for_var_map, var_def, iter_expr
+        return for_var_map, iter_expr
 
-    def _add_lv(self, var_def, var_map_stk):
-        for t, name in var_def.iter_names():
-            if name in var_map_stk[-1]:
-                t.syntax_err("局部变量‘%s’重定义")
-            for var_map in var_map_stk[: -1]:
-                if name in var_map:
-                    t.syntax_err("局部变量‘%s’和上层局部变量名字冲突")
-            swc_mod.check_lv_name_conflict(name, t, self.mod)
-            var_map_stk[-1][name] = t
+    def _add_lv(self, name, tp, var_map_stk):
+        if name in var_map_stk[-1]:
+            tp.token.syntax_err("局部变量‘%s’重定义")
+        for var_map in var_map_stk[: -1]:
+            if name in var_map:
+                tp.token.syntax_err("局部变量‘%s’和上层局部变量名字冲突")
+        swc_mod.check_lv_name_conflict(name, tp.token, self.mod)
+        var_map_stk[-1][name] = tp

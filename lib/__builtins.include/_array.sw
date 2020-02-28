@@ -147,7 +147,7 @@ class _Array
         _throw_on_repeat_count_err(count, this_sz);
         !<<
         new_s := make([]sw_obj, 0, l_this_sz * l_count)
-        for i := sw_cls_int(0); i < l_count; i ++ {
+        for i := int64(0); i < l_count; i ++ {
             new_s = append(new_s, this.v...)
         }
         !>>
@@ -172,7 +172,7 @@ class _Array
     public func size() int
     {
         !<<
-        return sw_cls_int(int64(len(this.v)))
+        return int64(len(this.v))
         !>>
     }
 

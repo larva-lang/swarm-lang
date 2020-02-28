@@ -55,7 +55,7 @@ public class str
     {
         _throw_on_idx_err(idx, this.len());
         !<<
-        return sw_cls_int(this.v[l_idx])
+        return this.v[l_idx]
         !>>
     }
 
@@ -76,11 +76,11 @@ public class str
             !<<
             v := sw_obj_str_to_go_str(l_other)
             if this.v < other.v {
-                return sw_cls_int(-1)
+                return -1
             } else if this.v > other.v {
-                return sw_cls_int(1)
+                return 1
             } else {
-                return sw_cls_int(0)
+                return 0
             }
             !>>
         }
@@ -94,9 +94,9 @@ public class str
             !<<
             v := sw_obj_str_to_go_str(l_other)
             if this.v == other.v {
-                return sw_cls_int(1)
+                return 1
             } else {
-                return sw_cls_int(0)
+                return 0
             }
             !>>
         }
@@ -127,7 +127,7 @@ public class str
     public func len() int
     {
         !<<
-        return sw_cls_int(int64(len(this.v)))
+        return int64(len(this.v))
         !>>
     }
 
@@ -141,9 +141,9 @@ public class str
         !<<
         v := sw_obj_str_to_go_str(l_s)
         if strings.Contains(this.v, v) {
-            return sw_cls_int(1)
+            return 1
         } else {
-            return sw_cls_int(0)
+            return 0
         }
         !>>
     }

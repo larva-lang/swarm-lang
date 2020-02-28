@@ -1,6 +1,6 @@
 !<<
 
-func sw_obj_int_from_go_bool(b bool) sw_cls_int {
+func sw_obj_int_from_go_bool(b bool) int64 {
     if b {
         return 1
     } else {
@@ -9,7 +9,7 @@ func sw_obj_int_from_go_bool(b bool) sw_cls_int {
 }
 
 func sw_obj_to_go_bool(x sw_obj) bool {
-    return x.(sw_cls_int) != 0
+    return int64(x.(sw_cls_int)) != 0
 }
 
 !>>

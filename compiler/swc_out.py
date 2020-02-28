@@ -586,7 +586,7 @@ def _output_stmt_list(code, stmt_list):
                     _output_stmt_list(code, stmt.else_stmt_list)
             continue
 
-        if stmt.type == "return_nil":
+        if stmt.type == "return_nil": #return_default todo
             code += "return (%s)" % _gen_nil_literal()
             continue
 

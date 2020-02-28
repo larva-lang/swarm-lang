@@ -54,11 +54,11 @@ public class float
             !<<
             other_v := l_other.(*sw_cls_@<<:float>>).v
             if this.v < other_v {
-                return sw_cls_int(-1)
+                return -1
             } else if this.v > other_v {
-                return sw_cls_int(1)
+                return 1
             } else {
-                return sw_cls_int(0)
+                return 0
             }
             !>>
         }
