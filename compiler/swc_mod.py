@@ -1,8 +1,8 @@
 #coding=utf8
 
-import os, random
+import os
 
-import swc_util, swc_token, swc_expr, swc_stmt
+import swc_util, swc_token, swc_expr, swc_stmt, swc_type
 
 mod_path = None
 
@@ -16,34 +16,23 @@ def _make_internal_method_sign_set():
     def add_internal_method_sign(simple_name, arg_count):
         s.add(("__%s__" % simple_name, arg_count))
 
-    #默认构造方法
-    add_internal_method_sign("init", 0)
     #字符串表示相关
     add_internal_method_sign("repr", 0)
     add_internal_method_sign("str", 0)
-    #布尔值
-    add_internal_method_sign("bool", 0)
-    #包含元素相关
-    add_internal_method_sign("getelem", 1)
-    add_internal_method_sign("setelem", 2)
-    add_internal_method_sign("getslice", 2)
-    add_internal_method_sign("setslice", 3)
-    #比较方法
-    add_internal_method_sign("lt", 1)
-    add_internal_method_sign("eq", 1)
-    #双目数值运算
-    for name in "add", "sub", "mul", "div", "mod", "shl", "shr", "and", "or", "xor":
-        for prefix in "", "i_":
-            add_internal_method_sign(prefix + name, 1)
-    #单目数值运算
-    for name in "inv", "pos", "neg":
-        add_internal_method_sign(name, 0)
 
     return s
 
 all_attr_name_set           = swc_util.OrderedSet()             #用于存储所有定义的属性名字
 all_usr_method_sign_set     = swc_util.OrderedSet()             #用于存储所有定义的方法的签名，元素为(方法名, 参数数量)
 internal_method_sign_set    = _make_internal_method_sign_set()  #用于存储所有内部方法的签名
+
+def parse_var_name_def(token_list):
+    t, name = token_list.pop_name()
+    if token_list.peek().is_reserved("int"):
+        tp = swc_type.Type(token_list.pop(), True)
+    else:
+        tp = swc_type.Type(t, False)
+    return t, name, tp
 
 def _parse_decr_set(token_list):
     decr_set = set()
@@ -61,19 +50,15 @@ def _parse_decr_set(token_list):
 
 def _parse_arg_map(token_list):
     arg_map = swc_util.OrderedDict()
-    while True:
-        if token_list.peek().is_sym(")"):
-            break
-        t, name = token_list.pop_name()
-        if name in arg_map:
-            t.syntax_err("参数重复定义")
-        arg_map[name] = t
-        t = token_list.peek()
-        if t.is_sym(")"):
-            break
-        if not t.is_sym(","):
-            t.syntax_err("需要‘,’或‘)’")
+    if token_list.peek().is_sym(")"):
         token_list.pop()
+    else:
+        def parse_single_arg():
+            t, name, tp = parse_var_name_def(token_list)
+            if name in arg_map:
+                t.syntax_err("参数重复定义")
+            arg_map[name] = tp
+        swc_util.parse_items(token_list, parse_single_arg, ")")
     return arg_map
 
 def precompile(main_mod_name):
@@ -169,25 +154,27 @@ class _ModElem:
         assert [self.is_cls, self.is_func, self.is_gv].count(True) == 1
 
 class _Attr:
-    def __init__(self, cls, decr_set, name_token, name):
+    def __init__(self, cls, decr_set, name_token, name, tp):
         self.cls        = cls
         self.decr_set   = decr_set
         self.is_public  = "public" in decr_set
         self.name_token = name_token
         self.name       = name
+        self.tp         = tp
 
         all_attr_name_set.add(self.name)
 
     __repr__ = __str__ = lambda self : "%s.%s" % (self.cls, self.name)
 
 class _Method:
-    def __init__(self, cls, decr_set, name_token, name, arg_map, block_token_list):
+    def __init__(self, cls, decr_set, name_token, name, arg_map, tp, block_token_list):
         self.cls        = cls
         self.decr_set   = decr_set
         self.is_public  = "public" in decr_set
         self.name_token = name_token
         self.name       = name
         self.arg_map    = arg_map
+        self.tp         = tp
 
         self.block_token_list   = block_token_list
         self.stmt_list          = None
@@ -241,20 +228,13 @@ class _Cls(_ModElem):
 
             if t.is_reserved("var"):
                 #属性定义
-                while True:
-                    t, name = token_list.pop_name()
+                def parse_single_attr():
+                    t, name, tp = parse_var_name_def()
                     if name.startswith("__") and name.endswith("__"):
                         t.syntax_err("属性不能使用内建方法名的样式")
                     self._check_redefine(t, name)
-                    self.attr_map[name] = _Attr(self, decr_set, t, name)
-                    t, sym = token_list.pop_sym()
-                    if sym == ";":
-                        break
-                    if sym != ",":
-                        t.syntax_err("需要‘,’或‘;’")
-                    if token_list.peek().is_sym(";"):
-                        token_list.pop()
-                        break
+                    self.attr_map[name] = _Attr(self, decr_set, t, name, tp)
+                swc_util.parse_items(token_list, parse_single_attr, ";")
                 continue
 
             if t.is_reserved("func"):
@@ -262,31 +242,24 @@ class _Cls(_ModElem):
                 t, name = token_list.pop_name()
                 token_list.pop_sym("(")
                 arg_map = _parse_arg_map(token_list)
-                token_list.pop_sym(")")
-                arg_count = len(arg_map)
-                self._check_redefine(t, name, method_arg_count = arg_count)
+                self._check_redefine(t, name)
+                if token_list.peek().is_reserved("int"):
+                    tp = swc_type.Type(token_list.pop(), True)
+                else:
+                    tp = swc_type.Type(t, False)
                 token_list.pop_sym("{")
                 block_token_list, sym = swc_token.parse_token_list_until_sym(token_list, ("}",))
                 assert sym == "}"
-                self.method_map[(name, arg_count)] = _Method(self, decr_set, t, name, arg_map, block_token_list)
+                self.method_map[name] = _Method(self, decr_set, t, name, arg_map, tp, block_token_list)
                 self.method_name_set.add(name)
                 continue
 
             t.syntax_err("需要属性或方法定义")
 
-    def _check_redefine(self, t, name, method_arg_count = None):
-        if method_arg_count is None:
-            #属性定义
-            if name in self.attr_map:
-                t.syntax_err("属性名‘%s’重定义" % name)
-            if name in self.method_name_set:
-                t.syntax_err("属性名‘%s’和已定义的方法名冲突" % name)
-        else:
-            #方法定义
-            if name in self.attr_map:
-                t.syntax_err("方法名‘%s’和已定义的属性名冲突" % name)
-            if (name, method_arg_count) in self.method_map:
-                t.syntax_err("方法‘%s<%d>’已存在" % (name, method_arg_count))
+    def _check_redefine(self, t, name):
+        for m in self.attr_map, self.method_map:
+            if name in m:
+                t.syntax_err("方法或属性名‘%s’重定义" % name)
 
     def _expand_ext_cls(self, chain = ""):
         if self.ext_cls_expand_stat == "expanded":
@@ -320,23 +293,22 @@ class _Cls(_ModElem):
                     self.name_token.syntax_err("属性‘%s’有多个扩展来源：‘%s’、‘%s’等" % (attr.name, ext_attr.cls, cls))
                 ext_attr_map[attr.name] = attr
             #统计扩展方法，允许当前类重写
-            for (method_name, arg_count), method in cls.method_map.iteritems():
-                if (method_name, arg_count) in self.method_map:
+            for method_name, method in cls.method_map.iteritems():
+                if method_name in self.method_map:
                     #忽略已重写的
                     continue
-                ext_method = ext_method_map.get((method_name, arg_count))
+                ext_method = ext_method_map.get(method_name)
                 if ext_method is not None:
-                    self.name_token.syntax_err("方法‘%s<%d>’有多个扩展来源：‘%s’、‘%s’等" % (method_name, arg_count, ext_method.cls, cls))
-                ext_method_map[(method_name, arg_count)] = method
+                    self.name_token.syntax_err("方法‘%s’有多个扩展来源：‘%s’、‘%s’等" % (method_name, ext_method.cls, cls))
+                ext_method_map[method_name] = method
 
         for ext_attr in ext_attr_map.itervalues():
             assert ext_attr.name not in self.attr_map
-            self.attr_map[ext_attr.name] = _Attr(self, ext_attr.decr_set, ext_attr.name_token, ext_attr.name)
+            self.attr_map[ext_attr.name] = _Attr(self, ext_attr.decr_set, ext_attr.name_token, ext_attr.name, ext_attr.tp)
         for ext_method in ext_method_map.itervalues():
             assert ext_method.name not in self.method_map
-            self.method_map[(ext_method.name, len(ext_method.arg_map))] = (
-                _Method(self, ext_method.decr_set, ext_method.name_token, ext_method.name, ext_method.arg_map.copy(),
-                        ext_method.block_token_list.copy()))
+            self.method_map[ext_method.name] = _Method(self, ext_method.decr_set, ext_method.name_token, ext_method.name,
+                                                       ext_method.arg_map.copy(), ext_method.tp, ext_method.block_token_list.copy())
 
         self.ext_cls_name_list = None
         self.ext_cls_expand_stat = "expanded"
@@ -345,12 +317,11 @@ class _Cls(_ModElem):
         for method in self.method_map.itervalues():
             method._compile()
 
-    def get_construct_method(self, arg_count):
-        construct_method_name = "__init__"
-        return self.method_map.get((construct_method_name, arg_count))
+    def get_construct_method(self):
+        return self.method_map.get("__init__")
 
 class _Func(_ModElem):
-    def __init__(self, mod, decr_set, name_token, name, arg_map, block_token_list):
+    def __init__(self, mod, decr_set, name_token, name, arg_map, tp, block_token_list):
         _ModElem.__init__(self)
 
         self.mod        = mod
@@ -358,6 +329,7 @@ class _Func(_ModElem):
         self.name_token = name_token
         self.name       = name
         self.arg_map    = arg_map
+        self.tp         = tp
 
         self.block_token_list   = block_token_list
         self.stmt_list          = None
@@ -371,7 +343,7 @@ class _Func(_ModElem):
         del self.block_token_list
 
 class _Gv(_ModElem):
-    def __init__(self, mod, decr_set, name_token, name):
+    def __init__(self, mod, decr_set, name_token, name, tp, expr_token_list):
         _ModElem.__init__(self)
 
         self.mod        = mod
@@ -379,21 +351,20 @@ class _Gv(_ModElem):
         self.is_final   = "final" in decr_set
         self.name_token = name_token
         self.name       = name
-
-    __repr__ = __str__ = lambda self : "%s.%s" % (self.mod, self.name)
-
-class _GvInit:
-    def __init__(self, mod, var_def, expr_token_list):
-        self.mod        = mod
-        self.var_def    = var_def
+        self.tp         = tp
 
         self.expr_token_list    = expr_token_list
         self.expr               = None
 
+    __repr__ = __str__ = lambda self : "%s.%s" % (self.mod, self.name)
+
     def _compile(self):
-        self.expr = swc_expr.Parser(self.expr_token_list, self.mod, None, None, self.mod).parse(())
-        self.expr_token_list.pop_sym(";")
-        assert not self.expr_token_list
+        if self.expr_token_list is not None:
+            self.expr = swc_expr.Parser(self.expr_token_list, self.mod, None, None, self.mod).parse(())
+            self.expr_token_list.pop_sym(";")
+            assert not self.expr_token_list
+            if self.expr.tp.is_int and not self.tp.is_int:
+                self.tp = swc_type.Type(self.tp.token, True)
         del self.expr_token_list
 
 class Mod:
@@ -408,7 +379,6 @@ class Mod:
         self.gnc_list       = []
         self.cls_map        = swc_util.OrderedDict()
         self.func_map       = swc_util.OrderedDict()
-        self.func_name_set  = swc_util.OrderedSet()
         self.gv_map         = swc_util.OrderedDict()
         self.gv_init_list   = []
         self.gfo_list       = []
@@ -426,8 +396,7 @@ class Mod:
                 fns = [mod_fn]
                 incl_dn = "%s/%s.include" % (d, self.name)
                 if os.path.isdir(incl_dn):
-                    incl_fns = ["%s/%s" % (incl_dn, fn) for fn in os.listdir(incl_dn) if fn.endswith(".sw")]
-                    random.shuffle(incl_fns)
+                    incl_fns = sorted(["%s/%s" % (incl_dn, fn) for fn in os.listdir(incl_dn) if fn.endswith(".sw")])
                     fns += incl_fns
                 return fns
 
@@ -438,7 +407,7 @@ class Mod:
         token_list = swc_token.Parser(self.src_fns[0]).parse()
         for fn in self.src_fns[1 :]:
             tl = swc_token.Parser(fn).parse()
-            token_list.extend(tl)
+            token_list.extend_file(tl)
         self._parse_text(token_list)
 
     def _parse_text(self, token_list):
@@ -446,8 +415,12 @@ class Mod:
 
         import_end = False
         while token_list:
-            #解析import
+            if token_list.try_pop_file_end():
+                continue
+
             t = token_list.peek()
+
+            #解析import
             if t.is_reserved("import"):
                 #import
                 if import_end:
@@ -494,13 +467,14 @@ class Mod:
     def _parse_import(self, token_list):
         t = token_list.pop()
         assert t.is_reserved("import")
-        t, name = token_list.pop_name()
-        if name in self.dep_mod_set:
-            t.syntax_err("模块重复导入")
-        if not self.name.startswith("__") and name.startswith("__"):
-            t.syntax_err("普通模块不能显式导入内部模块‘%s’" % name)
-        self.dep_mod_set.add(name)
-        token_list.pop_sym(";")
+        def parse_single_import():
+            t, name = token_list.pop_name()
+            if name in self.dep_mod_set:
+                t.syntax_err("模块重复导入")
+            if not self.name.startswith("__") and name.startswith("__"):
+                t.syntax_err("普通模块不能显式导入内部模块‘%s’" % name)
+            self.dep_mod_set.add(name)
+        swc_util.parse_items(token_list, parse_single_import, ";")
 
     def _parse_cls(self, decr_set, token_list):
         t, name = token_list.pop_name()
@@ -509,17 +483,10 @@ class Mod:
         if token_list.peek().is_sym("("):
             #扩展了其他类
             token_list.pop_sym("(")
-            while True:
+            def parse_single_name():
                 t, ext_cls_name = token_list.pop_name()
                 ext_cls_name_list.append((t, ext_cls_name))
-                t, sym = token_list.pop_sym()
-                if sym == ")":
-                    break
-                if sym != ",":
-                    t.syntax_err("需要‘,’或‘)’")
-                if token_list.peek().is_sym(")"):
-                    token_list.pop_sym(")")
-                    break
+            swc_util.parse_items(token_list, parse_single_name, ")")
         token_list.pop_sym("{")
         cls = _Cls(self, decr_set, t, name, ext_cls_name_list)
         cls._parse(token_list)
@@ -528,58 +495,50 @@ class Mod:
 
     def _parse_func(self, decr_set, token_list):
         t, name = token_list.pop_name()
+        self._check_redefine(t, name)
         token_list.pop_sym("(")
         arg_map = _parse_arg_map(token_list)
-        token_list.pop_sym(")")
-        self._check_redefine(t, name, func_arg_count = len(arg_map))
+        if token_list.peek().is_reserved("int"):
+            tp = swc_type.Type(token_list.pop(), True)
+        else:
+            tp = swc_type.Type(t, False)
         token_list.pop_sym("{")
         block_token_list, sym = swc_token.parse_token_list_until_sym(token_list, ("}",))
         assert sym == "}"
-        self.func_map[(name, len(arg_map))] = _Func(self, decr_set, t, name, arg_map, block_token_list)
-        self.func_name_set.add(name)
+        self.func_map[name] = _Func(self, decr_set, t, name, arg_map, tp, block_token_list)
 
     def _parse_gv(self, decr_set, token_list):
-        var_def = swc_expr.parse_var_def(token_list)
-        for t, name in var_def.iter_names():
+        def parse_single_gv():
+            t, name, tp = parse_var_name_def(token_list)
             self._check_redefine(t, name)
-            self.gv_map[name] = _Gv(self, decr_set, t, name)
-        t = token_list.pop()
-        if t.is_sym(";"):
-            #无初始化
-            return
-        if not t.is_sym("="):
-            t.syntax_err("需要‘;’或‘=’")
-        block_token_list, sym = swc_token.parse_token_list_until_sym(token_list, (";",))
-        assert sym == ";"
-        self.gv_init_list.append(_GvInit(self, var_def, block_token_list))
+            if token_list.peek().is_sym("="):
+                token_list.pop_sym("=")
+                block_token_list, _ = swc_token.parse_token_list_until_sym(token_list, (",", ";"))
+                token_list.revert()
+            else:
+                block_token_list = None
+            self.gv_map[name] = _Gv(self, decr_set, t, name, tp, block_token_list)
+        swc_util.parse_items(token_list, parse_single_gv, ";")
 
-    def _check_redefine(self, t, name, func_arg_count = None):
+    def _check_redefine(self, t, name):
         if name in self.dep_mod_set:
             t.syntax_err("定义的名字和导入模块名重名")
-        if func_arg_count is None:
-            #类或全局变量
-            for i in self.cls_map, self.func_name_set, self.gv_map:
-                if name in i:
-                    t.syntax_err("与同模块中已定义的其他名字冲突")
-        else:
-            #函数
-            for i in self.cls_map, self.gv_map:
-                if name in i:
-                    t.syntax_err("函数名和同模块中已定义的类名或全局变量名冲突")
-            if (name, func_arg_count) in self.func_map:
-                t.syntax_err("函数‘%s<%d>’重定义" % (name, func_arg_count))
+        #类或全局变量
+        for i in self.cls_map, self.func_map, self.gv_map:
+            if name in i:
+                t.syntax_err("与同模块中已定义的其他名字冲突")
 
     def iter_mod_elems(self):
         for m in self.cls_map, self.func_map, self.gv_map:
             for elem in m.itervalues():
                 yield elem
 
-    def get_elems(self, name):
-        elems = []
+    def get_elem(self, name):
         for elem in self.iter_mod_elems():
             if elem.name == name:
-                elems.append(elem)
-        return elems
+                return elem
+        else:
+            return None
 
     def public_name_set(self):
         name_set = set()
@@ -611,8 +570,8 @@ class Mod:
                 yield func.arg_map
         mod_name_set = self.name_set()
         for arg_map in arg_maps():
-            for name, t in arg_map.iteritems():
-                check_lv_name_conflict(name, t, self)
+            for name, tp in arg_map.iteritems():
+                check_lv_name_conflict(name, tp.token, self)
 
     def _expand_ext_cls(self):
         for cls in self.cls_map.itervalues():
@@ -620,22 +579,21 @@ class Mod:
 
     def _check_main_func(self):
         assert self is main_mod
-        main_func = self.func_map.get(("main", 0))
+        main_func = self.func_map.get("main")
         if main_func is None:
             swc_util.exit("主模块‘%s’没有main函数" % self)
         if not main_func.is_public:
             swc_util.exit("主模块‘%s’的main函数必须是public的" % self)
+        if len(main_func.arg_map) != 0:
+            swc_util.exit("主模块‘%s’的main函数不能有参数" % self)
 
     def get_main_func(self):
         assert self is main_mod
-        return self.func_map[("main", 0)]
+        return self.func_map["main"]
 
     def _compile(self):
-        for m in self.cls_map, self.func_map:
-            for elem in m.itervalues():
-                elem._compile()
-        for gi in self.gv_init_list:
-            gi._compile()
+        for elem in self.iter_mod_elems():
+            elem._compile()
 
     def def_func_obj(self, func_obj):
         self.gfo_list.append(func_obj)
@@ -670,9 +628,8 @@ def parse_func_obj(func_token, token_list, mod, cls, var_map_stk):
 
     token_list.pop_sym("(")
     arg_map = _parse_arg_map(token_list)
-    token_list.pop_sym(")")
-    for name, t in arg_map.iteritems():
-        check_lv_name_conflict(name, t, mod)
+    for name, tp in arg_map.iteritems():
+        check_lv_name_conflict(name, tp.token, mod)
 
     func_obj = _FuncObj(mod, func_token, arg_map)
 

@@ -440,7 +440,7 @@ class Parser:
                         el_start_token("参数数量错误，构造‘bool’对象需要1个参数")
                     op = "cast_to_bool"
                 else:
-                    construct_method = elem.get_construct_method(len(el))
+                    construct_method = elem.get_construct_method()
                     if construct_method is None:
                         if el:
                             name_token.syntax_err("无法创建‘%s.%s’的实例，没有构造方法‘__init__<%d>’" % (mod, name, len(el)))

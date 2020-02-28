@@ -31,7 +31,7 @@ _SYM_SET = set("""~!()={}[]:;'",.""") | BINOCULAR_OP_SYM_SET
 _RESERVED_WORD_SET = set(["import", "class", "func", "for", "while", "if", "else", "return", "nil", "break", "continue", "this", "public",
                           "var", "defer", "final", "isinstanceof", "int"])
 
-class _Token:
+class _Token(swc_util.Freezable):
     def __init__(self, type, value, src_fn, line_idx, pos):
         self.id = swc_util.new_id()
 
@@ -49,13 +49,6 @@ class _Token:
             self.value = [self.value]
 
         self._freeze()
-
-    def _freeze(self):
-        self.is_freezed = True
-
-    def _unfreeze(self):
-        assert self.is_freezed
-        del self.__dict__["is_freezed"]
 
     def _set_is_XXX(self):
         """设置各种is_XXX属性
@@ -95,17 +88,9 @@ class _Token:
 
         self.is_native_code = self.type == "native_code"
 
+        self.is_file_end = self.type == "file_end"
+
     __repr__ = __str__ = lambda self: """<Token %r, %d, %d, %r>""" % (self.src_fn, self.line_idx + 1, self.pos + 1, self.value)
-
-    def __setattr__(self, name, value):
-        if self.__dict__.get("is_freezed", False):
-            swc_util.abort()
-        self.__dict__[name] = value
-
-    def __delattr__(self, name):
-        if self.__dict__.get("is_freezed", False):
-            swc_util.abort()
-        del self.__dict__[name]
 
     def syntax_err(self, msg = ""):
         swc_util.exit("%s %s" % (self.pos_desc(), msg))
@@ -119,6 +104,7 @@ class _Token:
 class _TokenList:
     def __init__(self, src_fn):
         self.src_fn = src_fn
+        self.extend_src_fn_list = []
         self.l = []
         self.i = 0
 
@@ -132,15 +118,30 @@ class _TokenList:
     def copy(self):
         return copy.deepcopy(self)
 
-    def extend(self, other):
+    def extend_file(self, other):
         assert self.i == 0 and other.i == 0
+        self._append(_Token("file_end", None, self.extend_src_fn_list[-1] if self.extend_src_fn_list else self.src_fn, -1, -1))
+        self.extend_src_fn_list.append(other.src_fn)
         self.l += other.l
+
+    def try_pop_file_end(self):
+        assert self
+        t = self.l[self.i]
+        if t.is_file_end:
+            self.i += 1
+            assert self.extend_src_fn_list
+            self.src_fn = self.extend_src_fn_list.pop(0)
+            return True
+        return False
 
     def peek(self, start_idx = 0):
         try:
-            return self.l[self.i + start_idx]
+            t = self.l[self.i + start_idx]
         except IndexError:
+            t = None
+        if t is None or t.is_file_end:
             swc_util.exit("文件[%s]代码意外结束" % self.src_fn)
+        return t
 
     def peek_name(self):
         t = self.peek()

@@ -118,3 +118,35 @@ def open_src_file(fn):
         warn("源代码文件[%s]含有回车符‘\\r’" % fn)
     f.seek(0, os.SEEK_SET)
     return f
+
+#解析逗号分隔的items，以end_sym结束
+def parse_items(token_list, parse_single_item, end_sym):
+    while True:
+        parse_single_item()
+        #以end_sym结尾，或者逗号+end_sym结尾，都是正常结束，只有逗号则继续下一个item
+        t, sym = token_list.pop_sym()
+        if sym == end_sym:
+            return
+        if sym != ",":
+            t.syntax_err("需要‘%s’或‘,’" % end_sym)
+        if token_list.peek().is_sym(end_sym):
+            token_list.pop_sym(end_sym)
+            return
+
+class Freezable:
+    def _freeze(self):
+        self._is_freezed = True
+
+    def _unfreeze(self):
+        assert self._is_freezed
+        del self.__dict__["_is_freezed"]
+
+    def __setattr__(self, name, value):
+        if self.__dict__.get("_is_freezed", False):
+            swc_util.abort()
+        self.__dict__[name] = value
+
+    def __delattr__(self, name):
+        if self.__dict__.get("_is_freezed", False):
+            swc_util.abort()
+        del self.__dict__[name]
