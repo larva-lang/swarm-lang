@@ -6,7 +6,7 @@ import swc_util, swc_mod
 
 out_dir = None
 
-_out_prog_dir = _prog_pkg_name = _exe_file = _main_pkg_file = _all_method_sign_set = None
+_out_prog_dir = _prog_pkg_name = _exe_file = _main_pkg_file = _all_method_name_set = None
 
 _POS_INFO_IGNORE = object()
 
@@ -104,32 +104,25 @@ class _Code:
             tb_info = t.src_fn, t.line_idx + 1, str(fom)
         _tb_map[(self.file_path_name, len(self.line_list) + 1 + adjust)] = tb_info
 
-def _init_all_method_sign_set():
-    #将所有可能的sw_method_*签名整合出来，不包括内部使用的类似type_name之类的
+def _init_all_method_name_set():
+    #将所有可能的sw_method_*整合出来，不包括内部使用的类似type_name之类的
 
-    global _all_method_sign_set
-    _all_method_sign_set = swc_util.OrderedSet()
+    global _all_method_name_set
+    _all_method_name_set = swc_util.OrderedSet()
 
     #内部方法
-    for name, arg_count in swc_mod.internal_method_sign_set:
-        _all_method_sign_set.add((name, arg_count))
+    for name, _ in swc_mod.internal_method_sign_set:
+        _all_method_name_set.add(name)
 
     #用户定义方法
-    for name, arg_count in swc_mod.all_usr_method_sign_set:
-        _all_method_sign_set.add((name, arg_count))
+    for name, _ in swc_mod.all_usr_method_sign_set:
+        _all_method_name_set.add(name)
 
     #函数对象的call方法
-    for fo_arg_count in swc_mod.func_obj_arg_count_set:
-        _all_method_sign_set.add(("call", fo_arg_count))
+    _all_method_name_set.add("call")
 
-def _get_builtins_cls(name):
-    return swc_mod.builtins_mod.cls_map[name]
-
-def _get_builtins_func(name, arg_count):
-    return swc_mod.builtins_mod.func_map[(name, arg_count)]
-
-def _get_builtins_gv(name):
-    return swc_mod.builtins_mod.gv_map[name]
+def _get_builtins_elem(name):
+    return swc_mod.builtins_mod.get_elem(name)
 
 #gens-------------------------------------------------------------
 
@@ -142,8 +135,10 @@ def _gen_init_mod_func_name(mod):
 def _gen_mod_elem_name(elem):
     for i in "cls", "func", "gv":
         if eval("elem.is_%s" % i):
-            suffix = "_%d" % len(elem.arg_map) if i == "func" else ""
-            return "sw_%s_%s_%d_%s%s" % (i, _gen_mod_name(elem.mod), len(elem.name), elem.name, suffix)
+            return "sw_%s_%s_%d_%s" % (i, _gen_mod_name(elem.mod), len(elem.name), elem.name)
+
+def _gen_builtins_elem_name(name):
+    return _gen_mod_elem_name(_get_builtins_elem(name))
 
 def _gen_str_literal(s):
     code_list = []
@@ -156,8 +151,11 @@ def _gen_str_literal(s):
             code_list.append(c)
     return '"%s"' % "".join(code_list)
 
-def _gen_method_name(name, arg_count):
-    return "sw_method_%s_%d" % (name, arg_count)
+def _gen_method_name(name):
+    return "sw_method_%s" % name
+
+def _gen_method_impl_name(name):
+    return "sw_methodimpl_%s" % name
 
 def _gen_get_attr_method_name(name):
     return "sw_attr_%s" % name
@@ -169,22 +167,15 @@ def _gen_literal_name(t):
     return "sw_literal_%d" % t.id
 
 def _gen_arg_def(arg_map, need_perm_arg = False):
-    al = ["l_%s sw_obj" % name for name in arg_map]
+    al = ["l_%s %s" % (name, "int64" if tp.is_int else "sw_obj") for name, tp in arg_map.iteritems()]
     if need_perm_arg:
         al = ["perm int64"] + al
     return ", ".join(al)
 
-def _gen_nil_literal():
-    return "sw_util_nil_obj"
+def _gen_new_obj_func_name(cls):
+    return "sw_new_obj_%s" % _gen_mod_elem_name(cls)
 
-def _gen_bool_literal(b):
-    return _gen_mod_elem_name(_get_builtins_gv("_bool_obj_%s" % ("true" if b else "false")))
-
-def _gen_new_obj_func_name(cls, arg_count):
-    return "sw_new_obj_%s_%d" % (_gen_mod_elem_name(cls), arg_count)
-
-def _gen_func_obj_stru_name(arg_count):
-    return "sw_fo_stru_%d" % arg_count
+todo BEGIN
 
 def _gen_internal_simple_exc(exc_cls_name, info):
     return "&%s{m_s: sw_obj_str_from_go_str(%s)}" % (_gen_mod_elem_name(_get_builtins_cls(exc_cls_name)), _gen_str_literal(info))
@@ -378,6 +369,8 @@ def _gen_expr_code(expr):
 
     swc_util.abort()
 
+todo END
+
 _BOOTER_START_PROG_FUNC_NAME = "Sw_booter_start_prog"
 
 def _output_main_pkg():
@@ -416,6 +409,8 @@ def _output_native_code(code, nc, fom):
                     s += "%s_%d_%s" % (_gen_mod_name(swc_mod.mod_map[mod_name]), len(name), name)
             code.record_tb_info((FakeToken(line_idx), fom))
             code += s
+
+todo BEGIN
 
 def _output_simple_assign(code, lvalue, expr_or_expr_code):
     mod = _curr_mod
@@ -828,6 +823,8 @@ def _output_util():
             for method_name, arg_count in [ms for ms in _all_method_sign_set if ms != ("call", arg_count)]:
                 _output_method_default(code, fo_stru_name, fo_name, method_name, arg_count)
 
+todo END
+
 def _make_prog():
     if platform.system() in ("Darwin", "Linux"):
         try:
@@ -849,7 +846,7 @@ def output():
     output_start_time = time.time()
     swc_util.vlog("开始输出go代码")
 
-    _init_all_method_sign_set()
+    _init_all_method_name_set()
 
     global _out_prog_dir, _prog_pkg_name, _exe_file, _main_pkg_file
 

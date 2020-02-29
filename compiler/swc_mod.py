@@ -578,6 +578,8 @@ class Mod:
             swc_util.exit("主模块‘%s’的main函数必须是public的" % self)
         if len(main_func.arg_map) != 0:
             swc_util.exit("主模块‘%s’的main函数不能有参数" % self)
+        if main_func.tp.is_int:
+            swc_util.exit("主模块‘%s’的main函数不能返回int" % self)
 
     def get_main_func(self):
         assert self is main_mod
