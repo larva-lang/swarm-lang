@@ -31,7 +31,7 @@ public class list(_Array)
         return this;
     }
 
-    public func pop(idx)
+    public func pop(idx int)
     {
         _throw_on_idx_err(idx, this.size());
         !<<

@@ -9,31 +9,35 @@ class Record
         str_comp,
     ;
 
+    func __init__()
+    {
+    }
+
     func assign(other)
     {
         this.ptr_comp   = other.ptr_comp;
-        this.discr      = other.discr;
-        this.enum_comp  = other.enum_comp;
-        this.int_comp   = other.int_comp;
+        this.discr      = other.discr.int;
+        this.enum_comp  = other.enum_comp.int;
+        this.int_comp   = other.int_comp.int;
         this.str_comp   = other.str_comp;
     }
 }
 
 final var
-    IDENT_0 = 0,
-    IDENT_1 = 1,
-    IDENT_2 = 2,
-    IDENT_3 = 3,
-    IDENT_4 = 4,
-    IDENT_5 = 5,
+    IDENT_0 int = 0,
+    IDENT_1 int = 1,
+    IDENT_2 int = 2,
+    IDENT_3 int = 3,
+    IDENT_4 int = 4,
+    IDENT_5 int = 5,
 ;
 
-final var LOOPS = 50000;
+final var LOOPS int = 50000;
 
-var int_glob = 0,
-    bool_glob = 0,
-    char_1_glob = 0,
-    char_2_glob = 0,
+var int_glob    int,
+    bool_glob   int,
+    char_1_glob int,
+    char_2_glob int,
 ;
 var array_1_glob = [0].repeat(51),
     array_2_glob = map(range(0, 51), func (i int) {
@@ -63,7 +67,7 @@ func func_2(str_par_1, str_par_2) int
         char_loc = 0;
     while (int_loc <= 1)
     {
-        if (func_1(str_par_1.char_at(int_loc), str_par_2.char_at(int_loc + 1)) == IDENT_1)
+        if (func_1(str_par_1.char_at(int_loc).int, str_par_2.char_at(int_loc + 1).int) == IDENT_1)
         {
             char_loc = 'A';
             int_loc = int_loc + 1;
@@ -79,7 +83,7 @@ func func_2(str_par_1, str_par_2) int
     }
     else
     {
-        if (str_par_1.cmp(str_par_2) > 0)
+        if (str_par_1.cmp(str_par_2).int > 0)
         {
             int_loc = int_loc + 7;
             return 1;
@@ -115,7 +119,7 @@ func proc_8(array_1_par, array_2_par, int_par_1 int, int_par_2 int)
     {
         array_2_par.get(int_loc).set(int_idx, int_loc);
     }
-    array_2_par.get(int_loc).set(int_loc - 1, array_2_par.get(int_loc).get(int_loc - 1) + 1);
+    array_2_par.get(int_loc).set(int_loc - 1, array_2_par.get(int_loc).get(int_loc - 1).int + 1);
     array_2_par.get(int_loc + 20).set(int_loc, array_1_par.get(int_loc));
     int_glob = 5;
 }
@@ -187,7 +191,7 @@ func proc_3(ptr_par_out)
     {
         int_glob = 100;
     }
-    ptr_glob.int_comp = proc_7(10, int_glob);
+    ptr_glob.int_comp = int_obj(proc_7(10, int_glob));
     return ptr_par_out;
 }
 
@@ -217,17 +221,17 @@ func proc_1(ptr_par_in)
     var next_record = ptr_par_in.ptr_comp;
     next_record.assign(ptr_glob);
 
-    ptr_par_in.int_comp     = 5;
+    ptr_par_in.int_comp     = int_obj(5);
     next_record.int_comp    = ptr_par_in.int_comp;
     next_record.ptr_comp    = ptr_par_in.ptr_comp;
     next_record.ptr_comp    = proc_3(next_record.ptr_comp);
 
-    if (next_record.discr == IDENT_1)
+    if (next_record.discr.int == IDENT_1)
     {
-        next_record.int_comp    = 6;
-        next_record.enum_comp   = proc_6(ptr_par_in.enum_comp);
+        next_record.int_comp    = int_obj(6);
+        next_record.enum_comp   = int_obj(proc_6(ptr_par_in.enum_comp.int));
         next_record.ptr_comp    = ptr_glob.ptr_comp;
-        next_record.int_comp    = proc_7(next_record.int_comp, 10);
+        next_record.int_comp    = int_obj(proc_7(next_record.int_comp.int, 10));
     }
     else
     {
@@ -239,9 +243,9 @@ func proc_1(ptr_par_in)
 func proc_0()
 {
     ptr_glob.ptr_comp   = ptr_glob_next;
-    ptr_glob.discr      = IDENT_1;
-    ptr_glob.enum_comp  = IDENT_3;
-    ptr_glob.int_comp   = 40;
+    ptr_glob.discr      = int_obj(IDENT_1);
+    ptr_glob.enum_comp  = int_obj(IDENT_3);
+    ptr_glob.int_comp   = int_obj(40);
     ptr_glob.str_comp   = "DHRYSTONE PROGRAM, SOME STRING";
 
     var str_1_loc = "DHRYSTONE PROGRAM, 1'ST STRING";
@@ -291,5 +295,5 @@ public func main()
     proc_0();
     var tm = time.time().sub(ts);
     println("Time used: %s sec".(tm));
-    println("This machine benchmarks at %s SwarmStones/second".(float(LOOPS).div(tm)));
+    println("This machine benchmarks at %s SwarmStones/second".(float(int_obj(LOOPS)).div(tm)));
 }

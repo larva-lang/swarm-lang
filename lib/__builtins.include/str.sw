@@ -1,11 +1,11 @@
 func _to_str(method, x)
 {
     var s;
-    if (method.eq("str"))
+    if (method.eq("str").int)
     {
         s = x.__str__();
     }
-    else if (method.eq("repr"))
+    else if (method.eq("repr").int)
     {
         s = x.__repr__();
     }

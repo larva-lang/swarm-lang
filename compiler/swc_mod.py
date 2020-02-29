@@ -354,11 +354,12 @@ class _Gv(_ModElem):
 
     def _compile(self):
         if self.expr_token_list is not None:
-            self.expr = swc_expr.Parser(self.expr_token_list, self.mod, None, None, self.mod).parse(())
-            self.expr_token_list.pop_sym(";")
+            self.expr = swc_expr.Parser(self.expr_token_list, self.mod, None, None, self.mod).parse((), None)
+            _, sym = self.expr_token_list.pop_sym()
+            assert sym in (";", ",")
             assert not self.expr_token_list
-            if self.expr.tp.is_int and not self.tp.is_int:
-                self.tp = self.tp.to_int_type()
+            if self.tp != self.expr.tp:
+                self.name_token.syntax_err("初始化表达式与全局变量类型不匹配")
         del self.expr_token_list
 
 class Mod:
@@ -601,13 +602,14 @@ def check_lv_name_conflict(name, t, mod):
 #swarm的函数对象比较简单统一，没必要和模块有从属关系，独立出来
 
 class _FuncObj:
-    def __init__(self, mod, func_token, arg_map):
+    def __init__(self, mod, func_token, arg_map, tp):
         self.id = swc_util.new_id()
 
         self.mod        = mod
         self.func_token = func_token
         self.arg_map    = arg_map
         self.stmt_list  = None
+        self.tp         = tp
 
     __repr__ = __str__ = lambda self: "func_obj[%s:%s:%s:%s]" % (self.mod, os.path.basename(self.func_token.src_fn),
                                                                  self.func_token.line_idx + 1, self.func_token.pos + 1)
@@ -622,7 +624,9 @@ def parse_func_obj(func_token, token_list, mod, cls, var_map_stk):
     for name, tp in arg_map.iteritems():
         check_lv_name_conflict(name, tp.token, mod)
 
-    func_obj = _FuncObj(mod, func_token, arg_map)
+    tp = swc_type.parse_type(func_token, token_list)
+
+    func_obj = _FuncObj(mod, func_token, arg_map, tp)
 
     token_list.pop_sym("{")
     func_obj.stmt_list = swc_stmt.Parser(token_list, mod, cls, func_obj).parse(var_map_stk + (arg_map.copy(),), 0)

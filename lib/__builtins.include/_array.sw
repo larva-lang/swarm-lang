@@ -47,7 +47,7 @@ class _Array
             l.append(repr(i));
             l.append(", ");
         }
-        l.set(l.size() - 1, end);
+        l.set(l.size().int - 1, end);
         return "".join(l);
     }
 
@@ -99,9 +99,9 @@ class _Array
             {
                 return 0;
             }
-            for (var i: range(0, this_sz if this_sz < other_sz else other_sz))
+            for (var i int: range(0, this_sz if this_sz < other_sz else other_sz))
             {
-                if ((op_is_lt && this.get(i).cmp(other.get(i)) >= 0) || (op_is_eq && !this.get(i).eq(other.get(i)).int))
+                if ((op_is_lt && this.get(i).cmp(other.get(i)).int >= 0) || (op_is_eq && !this.get(i).eq(other.get(i)).int))
                 {
                     return 0;
                 }

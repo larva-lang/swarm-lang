@@ -10,3 +10,10 @@ func (si sw_cls_int) sw_method___repr__(perm int64, args ...sw_obj) sw_obj {
 }
 
 !>>
+
+public func int_obj(x int)
+{
+    !<<
+    return sw_cls_int(l_x)
+    !>>
+}

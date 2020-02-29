@@ -49,7 +49,7 @@ class Parser:
                 if self.token_list.peek().is_sym(";"):
                     stmt = _Stmt("return_default")
                 else:
-                    stmt = _Stmt("return", expr = self.expr_parser.parse(var_map_stk))
+                    stmt = _Stmt("return", expr = self.expr_parser.parse(var_map_stk, self.fom.tp.is_int))
                 stmt_list.append(stmt)
                 self.token_list.pop_sym(";")
                 continue
@@ -65,7 +65,7 @@ class Parser:
 
             if t.is_reserved("while"):
                 self.token_list.pop_sym("(")
-                expr = self.expr_parser.parse(var_map_stk)
+                expr = self.expr_parser.parse(var_map_stk, True)
                 self.token_list.pop_sym(")")
                 self.token_list.pop_sym("{")
                 while_stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep + 1)
@@ -79,7 +79,7 @@ class Parser:
                 else_stmt_list = None
                 while True:
                     self.token_list.pop_sym("(")
-                    expr = self.expr_parser.parse(var_map_stk)
+                    expr = self.expr_parser.parse(var_map_stk, True)
                     self.token_list.pop_sym(")")
                     self.token_list.pop_sym("{")
                     if_stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep)
@@ -103,11 +103,11 @@ class Parser:
 
             if t.is_reserved("var"):
                 def parse_single_lv():
-                    t, name, tp = parse_var_name_def(self.token_list)
+                    t, name, tp = swc_mod.parse_var_name_def(self.token_list)
                     self._add_lv(name, tp, var_map_stk)
                     if self.token_list.peek().is_sym("="):
-                        token_list.pop_sym("=")
-                        init_expr = self.expr_parser.parse(var_map_stk)
+                        self.token_list.pop_sym("=")
+                        init_expr = self.expr_parser.parse(var_map_stk, None)
                         if init_expr.tp.is_int and not tp.is_int:
                             var_map_stk[-1][name] = tp.to_int_type()
                     else:
@@ -117,7 +117,7 @@ class Parser:
                 continue
 
             if t.is_reserved("defer"):
-                expr = self.expr_parser.parse(var_map_stk)
+                expr = self.expr_parser.parse(var_map_stk, None)
                 if expr.op not in ("call_this.method", "call_method", "call_func"):
                     t.syntax_err("defer表达式必须是一个函数或方法调用")
                 self.token_list.pop_sym(";")
@@ -134,7 +134,7 @@ class Parser:
             self.token_list.revert()
 
             expr_token = self.token_list.peek()
-            expr = self.expr_parser.parse(var_map_stk)
+            expr = self.expr_parser.parse(var_map_stk, None)
             t, sym = self.token_list.pop_sym()
             if sym == ";":
                 stmt_list.append(_Stmt("expr", expr = expr))
@@ -149,7 +149,7 @@ class Parser:
                 gv = lvalue.arg
                 if gv.is_final:
                     expr_token.syntax_err("不能对final修饰的全局变量‘%s’赋值" % gv)
-            expr = self.expr_parser.parse(var_map_stk)
+            expr = self.expr_parser.parse(var_map_stk, lvalue.tp.is_int)
             self.token_list.pop_sym(";")
             stmt_list.append(_Stmt("assign", lvalue = lvalue, expr = expr))
 
@@ -165,7 +165,7 @@ class Parser:
         for_var_map = swc_util.OrderedDict()
         self._add_lv(name, tp, var_map_stk + (for_var_map,))
         self.token_list.pop_sym(":")
-        iter_expr = self.expr_parser.parse(var_map_stk) #iter_expr不能用for_var_map的变量
+        iter_expr = self.expr_parser.parse(var_map_stk, False) #iter_expr不能用for_var_map的变量
         self.token_list.pop_sym(")")
         return for_var_map, iter_expr
 
