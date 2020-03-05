@@ -32,7 +32,7 @@ final var
     IDENT_5 int = 5,
 ;
 
-final var LOOPS int = 50000;
+final var LOOPS int = 5000000;
 
 var int_glob    int,
     bool_glob   int,

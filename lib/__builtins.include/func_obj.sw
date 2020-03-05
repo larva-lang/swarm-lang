@@ -23,7 +23,7 @@ func (fo *sw_fo_stru) sw_method___str__(perm int64, args ...sw_obj) sw_obj {
     return fo.sw_method___repr__(perm, args...)
 }
 
-type (fo *sw_fo_stru) sw_method_call(perm int64, args ...sw_obj) sw_obj {
+func (fo *sw_fo_stru) sw_method_call(perm int64, args ...sw_obj) sw_obj {
     return fo.f(perm, args...)
 }
 

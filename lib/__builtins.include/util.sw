@@ -45,6 +45,10 @@ func sw_util_isinstanceof_int(x sw_obj) int64 {
     }
 }
 
+func sw_util_abort_on_method_arg_count_err(arg_count, need_count int) {
+    panic(fmt.Sprintf("参数数量错误，需要%d个，传入%d个", need_count, arg_count))
+}
+
 !>>
 
 /* 后续再支持

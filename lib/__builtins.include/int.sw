@@ -2,7 +2,7 @@
 
 type sw_cls_int int64
 
-func sw_obj_int_from_go_int(x int64) {
+func sw_obj_int_from_go_int(x int64) sw_cls_int {
     return sw_cls_int(x)
 }
 

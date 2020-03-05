@@ -73,19 +73,19 @@ public class float
     func _arithmetic_binocular_oper(op, other)
     {
         !<<
-        if v, ok := l_other.(*sw_cls_@<<:float>>).v; ok {
+        if v, ok := l_other.(*sw_cls_@<<:float>>); ok {
             var result float64
             switch sw_obj_str_to_go_str(l_op) {
             case "+":
-                result = this.v + v
+                result = this.v + v.v
             case "-":
-                result = this.v - v
+                result = this.v - v.v
             case "*":
-                result = this.v * v
+                result = this.v * v.v
             case "/":
-                result = this.v / v
+                result = this.v / v.v
             case "%":
-                result = math.Mod(this.v, v)
+                result = math.Mod(this.v, v.v)
             default:
                 panic("bug")
             }

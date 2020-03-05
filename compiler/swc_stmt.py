@@ -109,7 +109,8 @@ class Parser:
                         self.token_list.pop_sym("=")
                         init_expr = self.expr_parser.parse(var_map_stk, None)
                         if init_expr.tp.is_int and not tp.is_int:
-                            var_map_stk[-1][name] = tp.to_int_type()
+                            tp = tp.to_int_type()
+                            var_map_stk[-1][name] = tp
                     else:
                         init_expr = None
                     stmt_list.append(_Stmt("var_def", name = name, tp = tp, init_expr = init_expr))

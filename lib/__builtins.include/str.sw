@@ -55,7 +55,7 @@ public class str
     {
         _throw_on_idx_err(idx, this.len());
         !<<
-        return this.v[l_idx]
+        return int64(this.v[l_idx])
         !>>
     }
 
@@ -75,9 +75,9 @@ public class str
         {
             !<<
             v := sw_obj_str_to_go_str(l_other)
-            if this.v < other.v {
+            if this.v < v {
                 return -1
-            } else if this.v > other.v {
+            } else if this.v > v {
                 return 1
             } else {
                 return 0
@@ -93,7 +93,7 @@ public class str
         {
             !<<
             v := sw_obj_str_to_go_str(l_other)
-            if this.v == other.v {
+            if this.v == v {
                 return 1
             } else {
                 return 0
@@ -185,7 +185,7 @@ func sw_obj_str_from_go_str(s string) *sw_cls_@<<:str>> {
 
 func sw_obj_to_go_str(obj sw_obj) string {
     //直接构造str对象并返回其内部value
-    return sw_new_obj_sw_cls_@<<:str>>_1(obj).v
+    return sw_new_obj_sw_cls_@<<:str>>(obj).v
 }
 
 func sw_obj_str_to_go_str(x sw_obj) string {
