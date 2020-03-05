@@ -175,13 +175,11 @@ def _gen_arg_def(arg_map, need_perm_arg = False):
 def _gen_new_obj_func_name(cls):
     return "sw_new_obj_%s" % _gen_mod_elem_name(cls)
 
-todo BEGIN
+def _gen_panic_str(s):
+    return "panic(%s)" % _gen_str_literal(s)
 
-def _gen_internal_simple_exc(exc_cls_name, info):
-    return "&%s{m_s: sw_obj_str_from_go_str(%s)}" % (_gen_mod_elem_name(_get_builtins_cls(exc_cls_name)), _gen_str_literal(info))
-
-def _gen_throw_no_perm_exc(info):
-    return _gen_throw_exc(_gen_internal_simple_exc("NoPerm", info))
+def _gen_panic_bug():
+    return _gen_panic_str("bug")
 
 def _gen_throw_exc(exc):
     return "%s(%s)" % (_gen_mod_elem_name(_get_builtins_func("throw", 1)), exc)
@@ -199,6 +197,12 @@ def _gen_cls_type_name(cls):
         name = name[len(builtins_prefix) :]
     assert name
     return name
+
+def _gen_type_assert_int(expr_code):
+    return "int64((%s).(sw_cls_int))" % expr_code
+
+def _gen_tp(tp):
+    return "int64" if tp.is_int else "sw_obj"
 
 #gens end-------------------------------------------------------------
 
@@ -233,13 +237,10 @@ def _gen_el_code(el, with_perm = False):
 def _gen_expr_code(expr):
     mod = _curr_mod
 
-    if expr.op == "literal":
+    if expr.op in ("literal", "literal_int"):
         t = expr.arg
         if t.is_literal("nil"):
-            return _gen_nil_literal()
-        if t.is_literal("bool"):
-            assert t.value in ("true", "false")
-            return _gen_bool_literal(t.value == "true")
+            return "nil"
         return "%s" % _gen_literal_name(t)
 
     if expr.op == "str_format":
@@ -249,13 +250,25 @@ def _gen_expr_code(expr):
             assert e.op == "to_go_fmt_str"
         return "sw_obj_str_from_go_str(sw_util_sprintf(%s, %s))" % (fmt_code, _gen_el_code(el)) if el else fmt_code
 
+    if expr.op == "type_assert_int":
+        e = expr.arg
+        return _gen_type_assert_int(_gen_expr_code(e))
+
+    if expr.op == "int_to_obj":
+        e = expr.arg
+        return "sw_obj_int_from_go_int(%s)" % _gen_expr_code(e)
+
     if expr.op == "isinstanceof_this":
         result = expr.arg
-        return _gen_bool_literal(result)
+        return "sw_util_%s" % ("true" if result else "false")
+
+    if expr.op == "isinstanceof_int":
+        e = expr.arg
+        return "sw_util_isinstanceof_int(%s)" % _gen_expr_code(e)
 
     if expr.op == "isinstanceof":
         e, cls = expr.arg
-        return "sw_obj_bool_from_go_bool(func () bool {_, ok := (%s).(*%s); return ok}())" % (_gen_expr_code(e), _gen_mod_elem_name(cls))
+        return "sw_obj_int_from_go_bool(func () bool {_, ok := (%s).(*%s); return ok}())" % (_gen_expr_code(e), _gen_mod_elem_name(cls))
 
     if expr.op == "func_obj":
         fo = expr.arg
@@ -265,15 +278,10 @@ def _gen_expr_code(expr):
         verb, e = expr.arg
         return "sw_util_to_go_fmt_str(%s, (%s))" % (_gen_str_literal("%" + verb), _gen_expr_code(e))
 
-    if expr.op == "cast_to_bool":
-        cls, (e,) = expr.arg
-        assert cls is _get_builtins_cls("bool")
-        return "%s(%s)" % (_gen_mod_elem_name(_get_builtins_func("_cast_to_bool", 1)), _gen_expr_code(e))
-
     if expr.op == "new_obj":
         cls, el = expr.arg
         assert cls.is_cls
-        return "%s(%s)" % (_gen_new_obj_func_name(cls, len(el)), _gen_el_code(el))
+        return "%s(%s)" % (_gen_new_obj_func_name(cls), _gen_el_code(el))
 
     if expr.op == "this":
         return "this"
@@ -284,7 +292,7 @@ def _gen_expr_code(expr):
 
     if expr.op == "call_this.method":
         name, el = expr.arg
-        return "this.%s(%s)" % (_gen_method_name(name, len(el)), _gen_el_code(el, with_perm = True))
+        return "this.%s(%s)" % (_gen_methodimpl_name(name), _gen_el_code(el, with_perm = True))
 
     if expr.op == ".":
         e, name = expr.arg
@@ -292,7 +300,7 @@ def _gen_expr_code(expr):
 
     if expr.op == "call_method":
         e, name, el = expr.arg
-        return "(%s).%s(%s)" % (_gen_expr_code(e), _gen_method_name(name, len(el)), _gen_el_code(el, with_perm = True))
+        return "(%s).%s(%s)" % (_gen_expr_code(e), _gen_method_name(name), _gen_el_code(el, with_perm = True))
 
     if expr.op == "call_func":
         func, el = expr.arg
@@ -314,62 +322,40 @@ def _gen_expr_code(expr):
 
     if expr.op == "dict":
         kvel = expr.arg
-        ecl = ["%s().reserve_space(sw_obj_int_from_go_int(%d))" % (_gen_new_obj_func_name(_get_builtins_cls("dict"), 0), len(kvel))]
+        ecl = ["%s().reserve_space(sw_obj_int_from_go_int(%d))" % (_gen_new_obj_func_name(_get_builtins_cls("dict")), len(kvel))]
         for ek, ev in kvel:
-            ecl.append(".%s(%d, (%s), (%s))" % (_gen_method_name("__setelem__", 2), mod.id, _gen_expr_code(ek), _gen_expr_code(ev)))
+            ecl.append(".%s(%d, (%s), (%s))" % (_gen_method_name("set"), mod.id, _gen_expr_code(ek), _gen_expr_code(ev)))
         return "".join(ecl)
 
-    if expr.op == "[:]":
-        e, begin_e, end_e = lvalue.arg
-        begin_ecode = _gen_nil_literal() if begin_e is None else _gen_expr_code(begin_e)
-        end_ecode   = _gen_nil_literal() if end_e is None else _gen_expr_code(end_e)
-        return "(%s).%s(%d, (%s), (%s))" % (_gen_expr_code(e), _gen_method_name("__getslice__", 2), mod.id, begin_ecode, end_ecode)
-
-    if expr.op == "[]":
-        e, ke = expr.arg
-        return "(%s).%s(%d, %s)" % (_gen_expr_code(e), _gen_method_name("__getelem__", 1), mod.id, _gen_expr_code(ke))
-
-    if expr.op == "!":  #bool not特殊处理
+    if expr.op == "!":
         e = expr.arg
-        return "%s(%s)" % (_gen_mod_elem_name(_get_builtins_func("_cast_to_bool_not", 1)), _gen_expr_code(e))
+        return "sw_obj_int_from_go_bool((%s) == 0)" % _gen_expr_code(e)
 
     if expr.op in ("~", "neg", "pos"):
-        imn = "inv" if expr.op == "~" else expr.op
-        e = expr.arg
-        return "(%s).%s(%d)" % (_gen_expr_code(e), _gen_method_name("__%s__" % imn, 0), mod.id)
-
-    if expr.op == "is": #is是特殊的双目运算
-        ea, eb = expr.arg
-        return "sw_obj_bool_from_go_bool((%s) == (%s))" % (_gen_expr_code(ea), _gen_expr_code(eb))
+        go_op = {"~": "^", "neg": "-", "pos": "+"}[expr.op]
+        return "%s(%s)" % (go_op, _gen_expr_code(e))
 
     if expr.op in ("&&", "||"):
         ea, eb = expr.arg
-        return "sw_obj_bool_from_go_bool(sw_obj_to_go_bool(%s) %s sw_obj_to_go_bool(%s))" % (_gen_expr_code(ea), expr.op, _gen_expr_code(eb))
+        return "sw_obj_int_from_go_bool((%s) != 0 %s (%s) != 0)" % (_gen_expr_code(ea), expr.op, _gen_expr_code(eb))
 
-    if expr.op in ("<", ">", "<=", ">="):
+    if expr.op in ("<", ">", "<=", ">=", "!=", "==", "!==", "==="):
+        go_op = expr.op
+        if go_op in ("!==", "==="):
+            go_op = go_op[: -1]
         ea, eb = expr.arg
-        if expr.op in (">", "<="):
-            ea, eb = eb, ea
-        need_bool_not = expr.op.endswith("=")
-        return "sw_obj_bool_from_go_bool(%ssw_obj_lt((%s), (%s)))" % ("!" if need_bool_not else "", _gen_expr_code(ea), _gen_expr_code(eb))
-
-    if expr.op in ("!=", "=="):
-        ea, eb = expr.arg
-        return "sw_obj_bool_from_go_bool(%ssw_obj_eq((%s), (%s)))" % ("!" if expr.op == "!=" else "", _gen_expr_code(ea), _gen_expr_code(eb))
+        return "sw_obj_int_from_go_bool((%s) %s (%s))" % (_gen_expr_code(ea), go_op, _gen_expr_code(eb))
 
     if expr.op in _BINOCULAR_OP_2_INTERNAL_METHOD:
-        imn = _BINOCULAR_OP_2_INTERNAL_METHOD[expr.op]
         ea, eb = expr.arg
-        return "(%s).%s(%d, %s)" % (_gen_expr_code(ea), _gen_method_name("__%s__" % imn, 1), mod.id, _gen_expr_code(eb))
+        return "(%s) %s (%s)" % (_gen_expr_code(ea), expr.op, _gen_expr_code(eb))
 
     if expr.op == "if-else":
         e_cond, ea, eb = expr.arg
-        return ("func () sw_obj {if sw_obj_to_go_bool(%s) {return (%s)} else {return (%s)}}()" %
-                (_gen_expr_code(e_cond), _gen_expr_code(ea), _gen_expr_code(eb)))
+        return ("func () %s {if (%s) != 0 {return (%s)} else {return (%s)}}()" %
+                (_gen_tp(expr.tp), _gen_expr_code(e_cond), _gen_expr_code(ea), _gen_expr_code(eb)))
 
     swc_util.abort()
-
-todo END
 
 _BOOTER_START_PROG_FUNC_NAME = "Sw_booter_start_prog"
 
@@ -410,8 +396,6 @@ def _output_native_code(code, nc, fom):
             code.record_tb_info((FakeToken(line_idx), fom))
             code += s
 
-todo BEGIN
-
 def _output_simple_assign(code, lvalue, expr_or_expr_code):
     mod = _curr_mod
 
@@ -436,20 +420,6 @@ def _output_simple_assign(code, lvalue, expr_or_expr_code):
             code += "l_%s = (%s)" % (name, expr_code)
             return
 
-        if lvalue.op == "[]":
-            obj_expr, key_expr = lvalue.arg
-            code += ("(%s).%s(%d, (%s), (%s))" %
-                     (_gen_expr_code(obj_expr), _gen_method_name("__setelem__", 2), mod.id, _gen_expr_code(key_expr), expr_code))
-            return
-
-        if lvalue.op == "[:]":
-            obj_expr, begin_e, end_e = lvalue.arg
-            begin_ecode = _gen_nil_literal() if begin_e is None else _gen_expr_code(begin_e)
-            end_ecode   = _gen_nil_literal() if end_e is None else _gen_expr_code(end_e)
-            code += ("(%s).%s(%d, (%s), (%s), (%s))" %
-                     (_gen_expr_code(obj_expr), _gen_method_name("__setslice__", 3), mod.id, begin_ecode, end_ecode, expr_code))
-            return
-
         if lvalue.op == "this.attr":
             name = lvalue.arg
             code += "this.m_%s = (%s)" % (name, expr_code)
@@ -459,21 +429,14 @@ def _output_simple_assign(code, lvalue, expr_or_expr_code):
             obj_expr, name = lvalue.arg
             code += "(%s).%s(%d, (%s))" % (_gen_expr_code(obj_expr), _gen_set_attr_method_name(name), mod.id, expr_code)
             return
-
-        assert lvalue.op == "tuple"
-        sub_lvalues = lvalue.arg
-        sub_lvalue_count = len(sub_lvalues)
-        assert sub_lvalue_count > 0
-        tmp_var_name = _gen_tmp_var_name()
-        code += ("var %s []sw_obj = %s((%s), sw_obj_int_from_go_int(%d)).(*%s).v" %
-                 (tmp_var_name, _gen_mod_elem_name(_get_builtins_func("_unpack_multi_value", 2)), expr_code, sub_lvalue_count,
-                  _gen_mod_elem_name(_get_builtins_cls("list"))))
-        for i, sub_lvalue in enumerate(sub_lvalues):
-            assert sub_lvalue.is_lvalue
-            output_simple_assign_ex(code, sub_lvalue, "%s[%d]" % (tmp_var_name, i))
+        
+        swc_util.abort()
 
     assert lvalue.is_lvalue
     output_simple_assign_ex(code, lvalue, expr_code)
+
+_in_func = False
+_ret_tp = None
 
 def _output_stmt_list(code, stmt_list):
     mod = _curr_mod
@@ -493,45 +456,13 @@ def _output_stmt_list(code, stmt_list):
             continue
 
         if stmt.type == "var_def":
-            for _, name in stmt.var_def.iter_names():
-                code += "var l_%s sw_obj" % name
-                code += "_ = l_%s" % name
-            if stmt.init_expr is not None:
-                _output_simple_assign(code, stmt.var_def.to_lvalue(), stmt.init_expr)
+            code += "var l_%s %s %s" % (stmt.name, _gen_tp(stmt.tp),
+                                        "" if stmt.init_expr is None else "= (%s)" % _gen_expr_code(stmt.init_expr))
+            code += "_ = l_%s" % stmt.name
             continue
 
         if stmt.type == "assign":
-            if stmt.sym == "=":
-                _output_simple_assign(code, stmt.lvalue, stmt.expr)
-            else:
-                assert stmt.lvalue.op not in ("[:]", "tuple") and stmt.sym.endswith("=")
-                aug_op = stmt.sym[: -1]
-                assert aug_op in _BINOCULAR_OP_2_INTERNAL_METHOD
-                imn = _BINOCULAR_OP_2_INTERNAL_METHOD[aug_op]
-                imn_expr_code = "%s(%d, (%s))" % (_gen_method_name("__i_%s__" % imn, 1), mod.id, _gen_expr_code(stmt.expr))
-                code.record_tb_info(stmt.lvalue.pos_info)
-                if stmt.lvalue.op == "[]":
-                    obj_expr, key_expr = stmt.lvalue.arg
-                    obj_tmp_var_name = _gen_tmp_var_name()
-                    code += "var %s sw_obj = (%s)" % (obj_tmp_var_name, _gen_expr_code(obj_expr))
-                    key_tmp_var_name = _gen_tmp_var_name()
-                    code.record_tb_info(stmt.lvalue.pos_info)
-                    code += "var %s sw_obj = (%s)" % (key_tmp_var_name, _gen_expr_code(key_expr))
-                    code.record_tb_info(stmt.lvalue.pos_info)
-                    code += ("%s.%s(%d, %s, %s.%s(%d, %s).%s)" %
-                             (obj_tmp_var_name, _gen_method_name("__setelem__", 2), mod.id, key_tmp_var_name, obj_tmp_var_name,
-                              _gen_method_name("__getelem__", 1), mod.id, key_tmp_var_name, imn_expr_code))
-                elif stmt.lvalue.op == ".":
-                    obj_expr, name = stmt.lvalue.arg
-                    tmp_var_name = _gen_tmp_var_name()
-                    code += "var %s sw_obj = (%s)" % (tmp_var_name, _gen_expr_code(obj_expr))
-                    code.record_tb_info(stmt.lvalue.pos_info)
-                    code += "%s.%s(%d, %s.%s(%d).%s)" % (tmp_var_name, _gen_set_attr_method_name(name), mod.id, tmp_var_name,
-                                                         _gen_get_attr_method_name(name), mod.id, imn_expr_code)
-                else:
-                    assert stmt.lvalue.op in ("gv", "lv", "this.attr")
-                    lvalue_code = _gen_expr_code(stmt.lvalue)
-                    code += "%s = %s.%s" % (lvalue_code, lvalue_code, imn_expr_code)
+            _output_simple_assign(code, stmt.lvalue, stmt.expr)
             continue
 
         if stmt.type == "expr":
@@ -549,20 +480,21 @@ def _output_stmt_list(code, stmt_list):
                 iter_var_name = _gen_tmp_var_name()
                 code.record_tb_info(stmt.iter_expr.pos_info)
                 code += "var %s sw_obj = (%s).%s(%d)" % (iter_var_name, _gen_expr_code(stmt.iter_expr), _gen_method_name("iter", 0), mod.id)
-                for name in stmt.for_var_map:
-                    code += "var l_%s sw_obj" % name
-                    code += "_ = l_%s" % name
+                assert len(stmt.for_var_map) == 1
+                name, tp = stmt.for_var_map.iteritems().next()
+                code += "var l_%s %s" % (name, _gen_tp(tp))
+                code += "_ = l_%s" % name
                 code.record_tb_info(stmt.iter_expr.pos_info)
-                with code.new_blk("for sw_obj_to_go_bool(%s)" % iter_var_name, start_with_blank_line = False):
+                with code.new_blk("for %s.%s(%d) != 0" % (iter_var_name, _gen_method_name("is_valid"), mod.id), start_with_blank_line = False):
                     code.record_tb_info(stmt.iter_expr.pos_info)
-                    _output_simple_assign(
-                        code, stmt.for_var_def.to_lvalue(), "%s.%s(%d)" % (iter_var_name, _gen_method_name("next", 0), mod.id))
+                    next_code = "%s.%s(%d)" % (iter_var_name, _gen_method_name("next"), mod.id)
+                    code += "l_%s = %s" % (name, _gen_type_assert_int(next_code) if tp.is_int else next_code)
                     _output_stmt_list(code, stmt.stmt_list)
             continue
 
         if stmt.type == "while":
             code.record_tb_info(stmt.expr.pos_info, adjust = 1)
-            with code.new_blk("for sw_obj_to_go_bool(%s)" % _gen_expr_code(stmt.expr)):
+            with code.new_blk("for (%s) != 0" % _gen_expr_code(stmt.expr)):
                 _output_stmt_list(code, stmt.stmt_list)
             continue
 
@@ -574,30 +506,60 @@ def _output_stmt_list(code, stmt_list):
             assert len(stmt.if_expr_list) == len(stmt.if_stmt_list_list)
             for i, (if_expr, if_stmt_list) in enumerate(zip(stmt.if_expr_list, stmt.if_stmt_list_list)):
                 code.record_tb_info(if_expr.pos_info, adjust = 1 if i == 0 else -1)
-                with code.new_blk("%sif sw_obj_to_go_bool(%s)" % ("" if i == 0 else "else ", _gen_expr_code(if_expr))):
+                with code.new_blk("%sif (%s) != 0" % ("" if i == 0 else "else ", _gen_expr_code(if_expr))):
                     _output_stmt_list(code, if_stmt_list)
             if stmt.else_stmt_list is not None:
                 with code.new_blk("else"):
                     _output_stmt_list(code, stmt.else_stmt_list)
             continue
 
-        if stmt.type == "return_nil": #return_default todo
-            code += "return (%s)" % _gen_nil_literal()
+        if stmt.type == "return_default":
+            if _ret_tp.is_int:
+                expr_code = "0"
+                if _in_func:
+                    expr_code = "sw_obj_int_from_go_int(%s)" % expr_code
+            else:
+                expr_code = "nil"
+            code += "return (%s)" % expr_code
             continue
 
         if stmt.type == "return":
+            expr_code = _gen_expr_code(stmt.expr)
+            if _ret_tp.is_int:
+                assert stmt.expr.tp.is_int
+                if _in_func:
+                    expr_code = "sw_obj_int_from_go_int(%s)" % expr_code
             code.record_tb_info(stmt.expr.pos_info)
-            code += "return (%s)" % _gen_expr_code(stmt.expr)
+            code += "return (%s)" % expr_code
             continue
 
         swc_util.abort()
 
+_METHOD_SIGN_CODE = "(perm int64, args ...sw_obj) sw_obj"
+
+def _output_parse_arg_code(code, arg_map):
+    arg_count = len(arg_map)
+    with code.new_blk("if len(args) != %d" % arg_count):
+        code += "sw_util_abort_on_method_arg_count_err(len(args), %d)" % arg_count
+    for i, (name, tp) in enumerate(arg_map.iteritems()):
+        arg_code = "args[%d]" % i
+        code += "var l_%s = " % (name, _gen_type_assert_int(arg_code) if tp.is_int else arg_code)
+
 def _output_func_obj_def(code, fo):
+    global _in_func, _ret_tp
+
     arg_count = len(fo.arg_map)
-    with code.new_blk("var %s sw_obj = &%s" % (_gen_fo_name(fo), _gen_func_obj_stru_name(arg_count))):
-        with code.new_blk("f: func (%s) sw_obj" % (_gen_arg_def(fo.arg_map)), start_with_blank_line = False, tail = ","):
+    with code.new_blk("var %s sw_obj = &sw_fo_stru" % (_gen_fo_name(fo))):
+        with code.new_blk("f: func %s" % (_METHOD_SIGN_CODE), start_with_blank_line = False, tail = ","):
+            _output_parse_arg_code(code, fo.arg_map)
+            _in_func = True
+            _ret_tp = fo.tp
             _output_stmt_list(code, fo.stmt_list)
-            code += "return %s" % _gen_nil_literal()
+            _in_func = True
+            _ret_tp = None
+            code += "return %s" % ("sw_obj_int_from_go_int(0)" if fo.tp.is_int else "nil")
+
+todo BEGIN
 
 def _output_attr_method_default(code, cls_stru_name, cls_type_name, attr_name):
     exc_code = _gen_internal_simple_exc("NoAttr", "‘%s’没有属性‘%s’" % (cls_type_name, attr_name))

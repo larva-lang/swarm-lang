@@ -32,6 +32,19 @@ func sw_util_to_go_fmt_str(format string, x sw_obj) string {
     panic("bug")
 }
 
+var (
+    sw_util_true    int64 = 1
+    sw_util_false   int64 = 0
+)
+
+func sw_util_isinstanceof_int(x sw_obj) int64 {
+    if _, ok := x.(sw_cls_int); ok {
+        return 1
+    } else {
+        return 0
+    }
+}
+
 !>>
 
 /* 后续再支持

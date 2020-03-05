@@ -2,6 +2,10 @@
 
 type sw_cls_int int64
 
+func sw_obj_int_from_go_int(x int64) {
+    return sw_cls_int(x)
+}
+
 func (si sw_cls_int) type_name() string {
     return "int"
 }
@@ -26,6 +30,6 @@ func (si sw_cls_int) sw_method___str__(perm int64, args ...sw_obj) sw_obj {
 public func int_obj(x int)
 {
     !<<
-    return sw_cls_int(l_x)
+    return sw_obj_int_from_go_int(l_x)
     !>>
 }
