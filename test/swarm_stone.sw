@@ -35,7 +35,7 @@ final var
 final var LOOPS int = 5000000;
 
 var int_glob    int,
-    bool_glob   int,
+    bool_glob   bool,
     char_1_glob int,
     char_2_glob int,
 ;
@@ -48,20 +48,20 @@ var ptr_glob = Record(),
     ptr_glob_next = Record(),
 ;
 
-func func_3(enum_par_in int) int
+func func_3(enum_par_in int) bool
 {
     var enum_loc = enum_par_in;
     if (enum_loc == IDENT_3)
     {
-        return 1;
+        return true;
     }
     else
     {
-        return 0;
+        return false;
     }
 }
 
-func func_2(str_par_1, str_par_2) int
+func func_2(str_par_1, str_par_2) bool
 {
     var int_loc = 1,
         char_loc = 0;
@@ -79,18 +79,18 @@ func func_2(str_par_1, str_par_2) int
     }
     if (char_loc == 'X')
     {
-        return 1;
+        return true;
     }
     else
     {
         if (str_par_1.cmp(str_par_2).int > 0)
         {
             int_loc = int_loc + 7;
-            return 1;
+            return true;
         }
         else
         {
-            return 0;
+            return false;
         }
     }
 }
@@ -171,7 +171,7 @@ func proc_6(enum_par_in int) int
 func proc_5()
 {
     char_1_glob = 'A';
-    bool_glob = 0;
+    bool_glob = false;
 }
 
 func proc_4()
@@ -200,7 +200,7 @@ func proc_2(int_ptr_io int) int
     var int_loc = int_ptr_io + 10,
         enum_loc = IDENT_0,
     ;
-    while (1)
+    while (true)
     {
         if (char_1_glob == 'A')
         {

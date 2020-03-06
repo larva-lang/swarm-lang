@@ -52,8 +52,11 @@ public class dict
     {
         for (var kv: kv_it)
         {
-            this.set(kv.get(0), kv.get(1));
+            var k, v;
+            (k, v) = kv;
+            this.set(k, v);
         }
+        return this;
     }
 
     public func get(k)

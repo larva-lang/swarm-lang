@@ -6,6 +6,7 @@ public class list(_Array)
         !<<
         this.v[l_idx] = l_x
         !>>
+        return this;
     }
 
     public func clear()
@@ -35,9 +36,10 @@ public class list(_Array)
     {
         _throw_on_idx_err(idx, this.size());
         !<<
+        elem := this.v[l_idx]
         this.v = append(this.v[: l_idx], this.v[l_idx + 1 :]...)
+        return elem
         !>>
-        return this;
     }
 
     public func iter()

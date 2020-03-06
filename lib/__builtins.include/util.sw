@@ -32,44 +32,61 @@ func sw_util_to_go_fmt_str(format string, x sw_obj) string {
     panic("bug")
 }
 
-var (
-    sw_util_true    int64 = 1
-    sw_util_false   int64 = 0
-)
-
-func sw_util_isinstanceof_int(x sw_obj) int64 {
-    if _, ok := x.(sw_cls_int); ok {
-        return 1
-    } else {
-        return 0
-    }
+func sw_util_isinstanceof_bool(x sw_obj) bool {
+    _, ok := x.(sw_cls_bool)
+    return ok
 }
 
-func sw_util_abort_on_method_arg_count_err(arg_count, need_count int) {
+func sw_util_isinstanceof_int(x sw_obj) bool {
+    _, ok := x.(sw_cls_int)
+    return ok
+}
+
+func sw_util_abort_on_method_arg_count_err(arg_count int, need_count int) {
     panic(fmt.Sprintf("参数数量错误，需要%d个，传入%d个", need_count, arg_count))
 }
 
 !>>
 
-/* 后续再支持
-
-func _unpack_multi_value(it, count)
+func _unpack_multi_value(it, count int)
 {
-    var vs = [];
-    it = it.iter();
-    while (it)
-    {
-        if (vs.size() >= count)
+    !<<
+    var vs []sw_obj
+    switch o := it.(type) {
+    case *sw_cls_@<<:tuple>>:
+        vs = o.v
+    case *sw_cls_@<<:list>>:
+        vs = o.v
+    default:
+        vs = make([]sw_obj, 0, l_count + 1)
+    !>>
+        it = it.iter();
+        while (it.is_valid().bool)
         {
-            throw(ValueError("表达式解包解出的值过多，需要%d个".(count)));
+            !<<
+            if int64(len(vs)) >= l_count {
+                vs = append(vs, nil)    //多插入一个元素，作为错误标志
+                break
+            }
+            !>>
+            var elem = it.next();
+            !<<
+            vs = append(vs, l_elem);
+            !>>
         }
-        vs.append(it.next());
     }
-    if (vs.size() < count)
+    var vs_len int;
+    !<<
+    l_vs_len := int64(len(vs))
+    !>>
+    if (vs_len > count)
     {
-        throw(ValueError("表达式解包解出的值过少，需要%d个，解出%d个".(count, vs.size())));
+        throw(ValueError("表达式解包解出的值过多，需要%d个".(count)));
     }
-    return vs;
+    if (vs_len < count)
+        throw(ValueError("表达式解包解出的值过少，需要%d个，解出%d个".(count, vs_len)));
+    }
+    !<<
+    return sw_obj_tuple_from_go_slice(vs, false)
+    !>>
 }
-
-*/

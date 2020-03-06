@@ -265,7 +265,7 @@ def _gen_expr_code(expr):
 
     if expr.op == "isinstanceof":
         e, cls = expr.arg
-        return "sw_obj_int_from_go_bool(func () bool {_, ok := (%s).(*%s); return ok}())" % (_gen_expr_code(e), _gen_mod_elem_name(cls))
+        return "func () bool {_, ok := (%s).(*%s); return ok}()" % (_gen_expr_code(e), _gen_mod_elem_name(cls))
 
     if expr.op == "func_obj":
         fo = expr.arg
@@ -327,7 +327,7 @@ def _gen_expr_code(expr):
 
     if expr.op == "!":
         e = expr.arg
-        return "sw_obj_int_from_go_bool((%s) == 0)" % _gen_expr_code(e)
+        return "!(%s)" % _gen_expr_code(e)
 
     if expr.op in ("~", "neg", "pos"):
         go_op = {"~": "^", "neg": "-", "pos": "+"}[expr.op]
@@ -335,14 +335,14 @@ def _gen_expr_code(expr):
 
     if expr.op in ("&&", "||"):
         ea, eb = expr.arg
-        return "sw_obj_int_from_go_bool((%s) != 0 %s (%s) != 0)" % (_gen_expr_code(ea), expr.op, _gen_expr_code(eb))
+        return "(%s) %s (%s)" % (_gen_expr_code(ea), expr.op, _gen_expr_code(eb))
 
     if expr.op in ("<", ">", "<=", ">=", "!=", "==", "!==", "==="):
         go_op = expr.op
         if go_op in ("!==", "==="):
             go_op = go_op[: -1]
         ea, eb = expr.arg
-        return "sw_obj_int_from_go_bool((%s) %s (%s))" % (_gen_expr_code(ea), go_op, _gen_expr_code(eb))
+        return "(%s) %s (%s)" % (_gen_expr_code(ea), go_op, _gen_expr_code(eb))
 
     if expr.op in _BINOCULAR_OP_2_INTERNAL_METHOD:
         ea, eb = expr.arg

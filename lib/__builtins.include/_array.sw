@@ -85,42 +85,20 @@ class _Array
         }
     }
 
-    public func _cmp_oper(op, other) int
+    func _is_same_type_with_this(other) bool
     {
-        var op_is_lt = op.eq("<").int,
-            op_is_eq = !op_is_lt,
-        ;
-
-        var do_cmp = func () int {
-            var this_sz     = this.size(),
-                other_sz    = other.size().int,
-            ;
-            if (op_is_eq && this_sz != other_sz)
-            {
-                return 0;
-            }
-            for (var i int: range(0, this_sz if this_sz < other_sz else other_sz))
-            {
-                if ((op_is_lt && this.get(i).cmp(other.get(i)).int >= 0) || (op_is_eq && !this.get(i).eq(other.get(i)).int))
-                {
-                    return 0;
-                }
-            }
-            return this_sz <= other_sz;
-        };
-
         if (isinstanceof(this, tuple))
         {
             if (isinstanceof(other, tuple))
             {
-                do_cmp.call();
+                return true;
             }
         }
         else if (isinstanceof(this, list))
         {
             if (isinstanceof(other, list))
             {
-                do_cmp.call();
+                return true;
             }
         }
         else
@@ -128,17 +106,60 @@ class _Array
             abort("bug");
         }
 
-        throw_unsupported_binocular_oper(op, this, other);
+        return false;
     }
 
-    public func lt(other) int
+    public func cmp(other) int
     {
-        return this._cmp_oper("<", other);
+        if (!this._is_same_type_with_this(other))
+        {
+            throw_unsupported_binocular_oper("比较", this, other);
+        }
+
+        var this_sz     = this.size(),
+            other_sz    = other.size().int,
+        ;
+        for (var i int: range(0, this_sz if this_sz < other_sz else other_sz))
+        {
+            var elem_cmp_result = this.get(i).cmp(other.get(i)).int;
+            if (elem_cmp_result != 0)
+            {
+                return elem_cmp_result;
+            }
+        }
+        if (this_sz < other_sz)
+        {
+            return -1;
+        }
+        if (this_sz > other_sz)
+        {
+            return 1;
+        }
+        return 0;
     }
 
-    public func eq(other) int
+    public func eq(other) bool
     {
-        return this._cmp_oper("==", other);
+        if (!this._is_same_type_with_this(other))
+        {
+            throw_unsupported_binocular_oper("判等", this, other);
+        }
+
+        var this_sz     = this.size(),
+            other_sz    = other.size().int,
+        ;
+        if (this_sz != other_sz)
+        {
+            return false;
+        }
+        for (var i int: range(0, this_sz))
+        {
+            if (!this.get(i).eq(other.get(i)).bool)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     public func repeat(count int)
@@ -176,7 +197,7 @@ class _Array
         !>>
     }
 
-    public func has(x) int
+    public func has(x) bool
     {
         //todo
         throw(NotImpl());
@@ -194,7 +215,7 @@ class _ArrayIter
         this.curr_idx   = 0;
     }
 
-    public func is_valid() int
+    public func is_valid() bool
     {
         return this.curr_idx < this.a.size().int;
     }

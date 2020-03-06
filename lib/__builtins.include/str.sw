@@ -1,11 +1,11 @@
 func _to_str(method, x)
 {
     var s;
-    if (method.eq("str").int)
+    if (method.eq("str").bool)
     {
         s = x.__str__();
     }
-    else if (method.eq("repr").int)
+    else if (method.eq("repr").bool)
     {
         s = x.__repr__();
     }
@@ -87,17 +87,12 @@ public class str
         throw_unsupported_binocular_oper("比较", this, other);
     }
 
-    public func eq(other) int
+    public func eq(other) bool
     {
         if (isinstanceof(other, str))
         {
             !<<
-            v := sw_obj_str_to_go_str(l_other)
-            if this.v == v {
-                return 1
-            } else {
-                return 0
-            }
+            return this.v == sw_obj_str_to_go_str(l_other)
             !>>
         }
         throw_unsupported_binocular_oper("判等", this, other);
@@ -131,7 +126,7 @@ public class str
         !>>
     }
 
-    public func has(s) int
+    public func has(s) bool
     {
         if (!isinstanceof(s, str))
         {
@@ -140,11 +135,7 @@ public class str
 
         !<<
         v := sw_obj_str_to_go_str(l_s)
-        if strings.Contains(this.v, v) {
-            return 1
-        } else {
-            return 0
-        }
+        return strings.Contains(this.v, v)
         !>>
     }
 

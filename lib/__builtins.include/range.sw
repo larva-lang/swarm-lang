@@ -8,7 +8,7 @@ public class range
         this.end    = end;
     }
 
-    public func is_valid() int
+    public func is_valid() bool
     {
         return this.curr < this.end;
     }

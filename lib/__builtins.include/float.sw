@@ -65,7 +65,7 @@ public class float
         throw_unsupported_binocular_oper("比较", this, other);
     }
 
-    public func eq(other) int
+    public func eq(other) bool
     {
         return this.cmp(other) == 0;
     }
@@ -76,15 +76,15 @@ public class float
         if v, ok := l_other.(*sw_cls_@<<:float>>); ok {
             var result float64
             switch sw_obj_str_to_go_str(l_op) {
-            case "+":
+            case "add":
                 result = this.v + v.v
-            case "-":
+            case "sub":
                 result = this.v - v.v
-            case "*":
+            case "mul":
                 result = this.v * v.v
-            case "/":
+            case "div":
                 result = this.v / v.v
-            case "%":
+            case "mod":
                 result = math.Mod(this.v, v.v)
             default:
                 panic("bug")
@@ -97,23 +97,23 @@ public class float
 
     public func add(other)
     {
-        return this._arithmetic_binocular_oper("+", other);
+        return this._arithmetic_binocular_oper("add", other);
     }
     public func sub(other)
     {
-        return this._arithmetic_binocular_oper("-", other);
+        return this._arithmetic_binocular_oper("sub", other);
     }
     public func mul(other)
     {
-        return this._arithmetic_binocular_oper("*", other);
+        return this._arithmetic_binocular_oper("mul", other);
     }
     public func div(other)
     {
-        return this._arithmetic_binocular_oper("/", other);
+        return this._arithmetic_binocular_oper("div", other);
     }
     public func mod(other)
     {
-        return this._arithmetic_binocular_oper("%", other);
+        return this._arithmetic_binocular_oper("mod", other);
     }
 
     public func neg()
