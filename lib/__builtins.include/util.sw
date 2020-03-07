@@ -52,7 +52,7 @@ func _unpack_multi_value(it, count int)
 {
     !<<
     var vs []sw_obj
-    switch o := it.(type) {
+    switch o := l_it.(type) {
     case *sw_cls_@<<:tuple>>:
         vs = o.v
     case *sw_cls_@<<:list>>:
@@ -79,7 +79,7 @@ func _unpack_multi_value(it, count int)
     !>>
     var vs_len int;
     !<<
-    l_vs_len := int64(len(vs))
+    l_vs_len = int64(len(vs))
     !>>
     if (vs_len > count)
     {

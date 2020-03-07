@@ -195,11 +195,18 @@ def _gen_cls_type_name(cls):
     assert name
     return name
 
+def _gen_type_assert_bool(expr_code):
+    return "bool((%s).(sw_cls_bool))" % expr_code
+
 def _gen_type_assert_int(expr_code):
     return "int64((%s).(sw_cls_int))" % expr_code
 
 def _gen_tp(tp):
-    return "int64" if tp.is_int else "sw_obj"
+    if tp.is_bool:
+        return "bool"
+    if tp.is_int:
+        return "int64"
+    return "sw_obj"
 
 #gens end-------------------------------------------------------------
 
@@ -238,6 +245,8 @@ def _gen_expr_code(expr):
         t = expr.arg
         if t.is_literal("nil"):
             return "nil"
+        if t.is_literal("bool"):
+            return t.value
         return "%s" % _gen_literal_name(t)
 
     if expr.op == "str_format":
@@ -247,9 +256,17 @@ def _gen_expr_code(expr):
             assert e.op == "to_go_fmt_str"
         return "sw_obj_str_from_go_str(sw_util_sprintf(%s, %s))" % (fmt_code, _gen_el_code(el)) if el else fmt_code
 
+    if expr.op == "type_assert_bool":
+        e = expr.arg
+        return _gen_type_assert_bool(_gen_expr_code(e))
+
     if expr.op == "type_assert_int":
         e = expr.arg
         return _gen_type_assert_int(_gen_expr_code(e))
+
+    if expr.op == "bool_to_obj":
+        e = expr.arg
+        return "sw_obj_bool_from_go_bool(%s)" % _gen_expr_code(e)
 
     if expr.op == "int_to_obj":
         e = expr.arg
@@ -257,7 +274,11 @@ def _gen_expr_code(expr):
 
     if expr.op == "isinstanceof_this":
         result = expr.arg
-        return "sw_util_%s" % ("true" if result else "false")
+        return "true" if result else "false"
+
+    if expr.op == "isinstanceof_bool":
+        e = expr.arg
+        return "sw_util_isinstanceof_bool(%s)" % _gen_expr_code(e)
 
     if expr.op == "isinstanceof_int":
         e = expr.arg
@@ -273,8 +294,12 @@ def _gen_expr_code(expr):
 
     if expr.op == "to_go_fmt_str":
         verb, e = expr.arg
-        return ("sw_util_to_go_fmt_str(%s, %s(%s))" %
-                (_gen_str_literal("%" + verb), "sw_obj_int_from_go_int" if e.tp.is_int else "", _gen_expr_code(e)))
+        expr_code = _gen_expr_code(e)
+        if e.tp.is_bool:
+            expr_code = "sw_obj_bool_from_go_bool(%s)" % expr_code
+        elif e.tp.is_int:
+            expr_code = "sw_obj_int_from_go_int(%s)" % expr_code
+        return "sw_util_to_go_fmt_str(%s, (%s))" % (_gen_str_literal("%" + verb), expr_code)
 
     if expr.op == "new_obj":
         cls, el = expr.arg
@@ -331,6 +356,7 @@ def _gen_expr_code(expr):
 
     if expr.op in ("~", "neg", "pos"):
         go_op = {"~": "^", "neg": "-", "pos": "+"}[expr.op]
+        e = expr.arg
         return "%s(%s)" % (go_op, _gen_expr_code(e))
 
     if expr.op in ("&&", "||"):
@@ -350,7 +376,7 @@ def _gen_expr_code(expr):
 
     if expr.op == "if-else":
         e_cond, ea, eb = expr.arg
-        return ("func () %s {if (%s) != 0 {return (%s)} else {return (%s)}}()" %
+        return ("func () %s {if (%s) {return (%s)} else {return (%s)}}()" %
                 (_gen_tp(expr.tp), _gen_expr_code(e_cond), _gen_expr_code(ea), _gen_expr_code(eb)))
 
     swc_util.abort()
@@ -427,8 +453,17 @@ def _output_simple_assign(code, lvalue, expr_or_expr_code):
             obj_expr, name = lvalue.arg
             code += "(%s).%s(%d, (%s))" % (_gen_expr_code(obj_expr), _gen_set_attr_method_name(name), mod.id, expr_code)
             return
-        
-        swc_util.abort()
+
+        assert lvalue.op == "tuple"
+        sub_lvalues = lvalue.arg
+        sub_lvalue_count = len(sub_lvalues)
+        assert sub_lvalue_count > 0
+        tmp_var_name = _gen_tmp_var_name()
+        code += ("var %s []sw_obj = %s((%s), %d).(*%s).v" %
+                 (tmp_var_name, _gen_builtins_elem_name("_unpack_multi_value"), expr_code, sub_lvalue_count, _gen_builtins_elem_name("tuple")))
+        for i, sub_lvalue in enumerate(sub_lvalues):
+            assert sub_lvalue.is_lvalue
+            output_simple_assign_ex(code, sub_lvalue, "%s[%d]" % (tmp_var_name, i))
 
     assert lvalue.is_lvalue
     output_simple_assign_ex(code, lvalue, expr_code)
@@ -481,16 +516,20 @@ def _output_stmt_list(code, stmt_list, ret_tp, in_fo = False):
                 code += "_ = l_%s" % name
                 code.record_tb_info(stmt.iter_expr.pos_info)
                 is_valid_code = "%s.%s(%d)" % (iter_var_name, _gen_method_name("is_valid"), mod.id)
-                with code.new_blk("for %s != 0" % _gen_type_assert_int(is_valid_code), start_with_blank_line = False):
+                with code.new_blk("for %s" % _gen_type_assert_bool(is_valid_code), start_with_blank_line = False):
                     code.record_tb_info(stmt.iter_expr.pos_info)
                     next_code = "%s.%s(%d)" % (iter_var_name, _gen_method_name("next"), mod.id)
-                    code += "l_%s = %s" % (name, _gen_type_assert_int(next_code) if tp.is_int else next_code)
+                    if tp.is_bool:
+                        next_code = _gen_type_assert_bool(next_code)
+                    elif tp.is_int:
+                        next_code = _gen_type_assert_int(next_code)
+                    code += "l_%s = %s" % (name, next_code)
                     _output_stmt_list(code, stmt.stmt_list, ret_tp, in_fo)
             continue
 
         if stmt.type == "while":
             code.record_tb_info(stmt.expr.pos_info, adjust = 1)
-            with code.new_blk("for (%s) != 0" % _gen_expr_code(stmt.expr)):
+            with code.new_blk("for (%s)" % _gen_expr_code(stmt.expr)):
                 _output_stmt_list(code, stmt.stmt_list, ret_tp, in_fo)
             continue
 
@@ -502,7 +541,7 @@ def _output_stmt_list(code, stmt_list, ret_tp, in_fo = False):
             assert len(stmt.if_expr_list) == len(stmt.if_stmt_list_list)
             for i, (if_expr, if_stmt_list) in enumerate(zip(stmt.if_expr_list, stmt.if_stmt_list_list)):
                 code.record_tb_info(if_expr.pos_info, adjust = 1 if i == 0 else -1)
-                with code.new_blk("%sif (%s) != 0" % ("" if i == 0 else "else ", _gen_expr_code(if_expr))):
+                with code.new_blk("%sif (%s)" % ("" if i == 0 else "else ", _gen_expr_code(if_expr))):
                     _output_stmt_list(code, if_stmt_list, ret_tp, in_fo)
             if stmt.else_stmt_list is not None:
                 with code.new_blk("else"):
@@ -510,7 +549,11 @@ def _output_stmt_list(code, stmt_list, ret_tp, in_fo = False):
             continue
 
         if stmt.type == "return_default":
-            if ret_tp.is_int:
+            if ret_tp.is_bool:
+                expr_code = "false"
+                if in_fo:
+                    expr_code = "sw_obj_bool_from_go_bool(%s)" % expr_code
+            elif ret_tp.is_int:
                 expr_code = "0"
                 if in_fo:
                     expr_code = "sw_obj_int_from_go_int(%s)" % expr_code
@@ -521,7 +564,11 @@ def _output_stmt_list(code, stmt_list, ret_tp, in_fo = False):
 
         if stmt.type == "return":
             expr_code = _gen_expr_code(stmt.expr)
-            if ret_tp.is_int:
+            if ret_tp.is_bool:
+                assert stmt.expr.tp.is_bool
+                if in_fo:
+                    expr_code = "sw_obj_bool_from_go_bool(%s)" % expr_code
+            elif ret_tp.is_int:
                 assert stmt.expr.tp.is_int
                 if in_fo:
                     expr_code = "sw_obj_int_from_go_int(%s)" % expr_code
@@ -539,7 +586,11 @@ def _output_parse_arg_code(code, arg_map):
         code += "sw_util_abort_on_method_arg_count_err(len(args), %d)" % arg_count
     for i, (name, tp) in enumerate(arg_map.iteritems()):
         arg_code = "args[%d]" % i
-        code += "var l_%s = (%s)" % (name, _gen_type_assert_int(arg_code) if tp.is_int else arg_code)
+        if tp.is_bool:
+            arg_code = _gen_type_assert_bool(arg_code)
+        elif tp.is_int:
+            arg_code = _gen_type_assert_int(arg_code)
+        code += "var l_%s = (%s)" % (name, arg_code)
         code += "_ = l_%s" % name
 
 def _output_func_obj_def(code, fo):
@@ -548,10 +599,15 @@ def _output_func_obj_def(code, fo):
         with code.new_blk("f: func %s" % (_METHOD_SIGN_CODE), start_with_blank_line = False, tail = ","):
             _output_parse_arg_code(code, fo.arg_map)
             _output_stmt_list(code, fo.stmt_list, fo.tp, in_fo = True)
-            code += "return %s" % ("sw_obj_int_from_go_int(0)" if fo.tp.is_int else "nil")
+            if fo.tp.is_bool:
+                code += "return sw_obj_bool_from_go_bool(false)"
+            elif fo.tp.is_int:
+                code += "return sw_obj_int_from_go_int(0)"
+            else:
+                code += "return nil"
 
 def _output_attr_method_default(code, cls_stru_name, cls_type_name, attr_name):
-    cls_stru_type_code = cls_stru_name if cls_stru_name == "sw_cls_int" else "*" + cls_stru_name
+    cls_stru_type_code = cls_stru_name if cls_stru_name in ("sw_cls_bool", "sw_cls_int") else "*" + cls_stru_name
     panic_code = _gen_panic_str("‘%s’没有属性‘%s’" % (cls_type_name, attr_name))
     with code.new_blk("func (this %s) %s(perm int64) sw_obj" % (cls_stru_type_code, _gen_get_attr_method_name(attr_name))):
         code += panic_code
@@ -559,7 +615,7 @@ def _output_attr_method_default(code, cls_stru_name, cls_type_name, attr_name):
         code += panic_code
 
 def _output_method_default(code, cls_stru_name, cls_type_name, method_name):
-    cls_stru_type_code = cls_stru_name if cls_stru_name == "sw_cls_int" else "*" + cls_stru_name
+    cls_stru_type_code = cls_stru_name if cls_stru_name in ("sw_cls_bool", "sw_cls_int") else "*" + cls_stru_name
     with code.new_blk("func (this %s) %s%s" % (cls_stru_type_code, _gen_method_name(method_name), _METHOD_SIGN_CODE)):
         if len(method_name) > 4 and method_name.startswith("__") and method_name.endswith("__"):
             simple_method_name = method_name[2 : -2]
@@ -602,7 +658,7 @@ def _output_mod():
             prefix = "literal_"
             assert t.is_literal and t.type.startswith(prefix)
             literal_type = t.type[len(prefix) :]
-            if literal_type == "nil":
+            if literal_type in ("nil", "bool"):
                 #nil直接体现在目标代码中
                 continue
             if literal_type == "int":
@@ -640,7 +696,12 @@ def _output_mod():
         for func in mod.func_map.itervalues():
             with code.new_blk("func %s(%s) %s" % (_gen_mod_elem_name(func), _gen_arg_def(func.arg_map), _gen_tp(func.tp))):
                 _output_stmt_list(code, func.stmt_list, func.tp)
-                code += "return %s" % ("0" if func.tp.is_int else "nil")
+                if func.tp.is_bool:
+                    code += "return false"
+                elif func.tp.is_int:
+                    code += "return 0"
+                else:
+                    code += "return nil"
 
         #类的定义
         for cls in mod.cls_map.itervalues():
@@ -667,13 +728,17 @@ def _output_mod():
                             code += _gen_panic_str("对属性‘%s’没有权限" % attr)
                 with code.new_blk("func (this *%s) %s(perm int64) sw_obj" % (sw_cls_name, _gen_get_attr_method_name(attr.name))):
                     output_attr_perm_checking(code)
-                    if attr.tp.is_int:
+                    if attr.tp.is_bool:
+                        code += "return sw_obj_bool_from_go_bool(this.m_%s)" % attr.name
+                    elif attr.tp.is_int:
                         code += "return sw_obj_int_from_go_int(this.m_%s)" % attr.name
                     else:
                         code += "return this.m_%s" % attr.name
                 with code.new_blk("func (this *%s) %s(perm int64, v sw_obj)" % (sw_cls_name, _gen_set_attr_method_name(attr.name))):
                     output_attr_perm_checking(code)
-                    if attr.tp.is_int:
+                    if attr.tp.is_bool:
+                        code += "this.m_%s = %s" % (attr.name, _gen_type_assert_bool("v"))
+                    elif attr.tp.is_int:
                         code += "this.m_%s = %s" % (attr.name, _gen_type_assert_int("v"))
                     else:
                         code += "this.m_%s = v" % attr.name
@@ -688,13 +753,20 @@ def _output_mod():
                             code += _gen_panic_str("对方法‘%s’没有调用权限" % method)
                     _output_parse_arg_code(code, method.arg_map)
                     call_method_impl_code = "this.%s(%s)" % (sw_method_impl_name, ", ".join(["l_%s" % arg_name for arg_name in method.arg_map]))
-                    if method.tp.is_int:
+                    if method.tp.is_bool:
+                        call_method_impl_code = "sw_obj_bool_from_go_bool(%s)" % call_method_impl_code
+                    elif method.tp.is_int:
                         call_method_impl_code = "sw_obj_int_from_go_int(%s)" % call_method_impl_code
                     code += "return %s" % call_method_impl_code
                 with code.new_blk("func (this *%s) %s(%s) %s" %
                                   (sw_cls_name, sw_method_impl_name, _gen_arg_def(method.arg_map), _gen_tp(method.tp))):
                     _output_stmt_list(code, method.stmt_list, method.tp)
-                    code += "return %s" % ("0" if method.tp.is_int else "nil")
+                    if method.tp.is_bool:
+                        code += "return false"
+                    elif method.tp.is_int:
+                        code += "return 0"
+                    else:
+                        code += "return nil"
 
             #生成sw_new_obj_*函数
             construct_method = cls.method_map.get("__init__")
@@ -742,12 +814,14 @@ def _output_util():
             for name in _all_method_name_set:
                 code += "%s%s" % (_gen_method_name(name), _METHOD_SIGN_CODE)
 
-        #sw_cls_int和sw_fo_stru的方法的默认实现
+        #sw_cls_bool、sw_cls_int和sw_fo_stru的方法的默认实现
         for name in swc_mod.all_attr_name_set:
+            _output_attr_method_default(code, "sw_cls_bool", "bool", name)
             _output_attr_method_default(code, "sw_cls_int", "int", name)
             _output_attr_method_default(code, "sw_fo_stru", "func", name)
         for name in _all_method_name_set:
             if name not in ("__repr__", "__str__"):
+                _output_method_default(code, "sw_cls_bool", "bool", name)
                 _output_method_default(code, "sw_cls_int", "int", name)
                 if name != "call":
                     _output_method_default(code, "sw_fo_stru", "func", name)
