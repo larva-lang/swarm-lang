@@ -71,20 +71,23 @@ func _unpack_multi_value(it, count int)
             !>>
             var elem = it.next();
             !<<
-            vs = append(vs, l_elem);
+            vs = append(vs, l_elem)
             !>>
         }
+    !<<
     }
+    !>>
     var vs_len int;
     !<<
     l_vs_len := int64(len(vs))
     !>>
     if (vs_len > count)
     {
-        throw(ValueError("表达式解包解出的值过多，需要%d个".(count)));
+        throw(ValueError("表达式解包解出的值过多，需要%s个".(count)));
     }
     if (vs_len < count)
-        throw(ValueError("表达式解包解出的值过少，需要%d个，解出%d个".(count, vs_len)));
+    {
+        throw(ValueError("表达式解包解出的值过少，需要%s个，解出%s个".(count, vs_len)));
     }
     !<<
     return sw_obj_tuple_from_go_slice(vs, false)

@@ -234,7 +234,7 @@ def _gen_el_code(el, with_perm = False):
 def _gen_expr_code(expr):
     mod = _curr_mod
 
-    if expr.op in ("literal", "literal_int"):
+    if expr.op == "literal":
         t = expr.arg
         if t.is_literal("nil"):
             return "nil"

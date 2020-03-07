@@ -29,7 +29,7 @@ class _Expr:
         self.arg    = arg
         self.tp     = tp
 
-        self.is_lvalue = op in ("gv", "lv", "this.attr", ".")
+        self.is_lvalue = op in ("gv", "lv", "this.attr", ".") or (op == "tuple" and arg and all([e.is_lvalue for e in arg]))
 
         self.pos_info = None #位置信息，只有在解析栈finish时候才会被赋值为解析栈的开始位置，参考相关代码，主要用于output时候的代码位置映射构建
 
@@ -78,8 +78,8 @@ class _ParseStk:
             if len(self.stk) < 1:
                 self.start_token.syntax_err("非法的表达式")
             e = self._pop_expr()
-            if not e.tp.is_int:
-                self.start_token.syntax_err("不能对非int类型做‘%s’运算" % op)
+            if (op == "!" and not e.tp.is_bool) or (op != "!" and not e.tp.is_int):
+                self.start_token.syntax_err("不能对类型‘%s’做‘%s’运算" % (e.tp, op))
             self._push_expr(_Expr(op, e, e.tp))
 
         elif op in _BINOCULAR_OP_SET:
@@ -88,14 +88,26 @@ class _ParseStk:
                 self.start_token.syntax_err("非法的表达式")
             eb = self._pop_expr()
             ea = self._pop_expr()
+            invalid_expr_syntax_err = lambda: self.start_token.syntax_err("不能对类型‘%s’和‘%s’做‘%s’运算" % (ea.tp, tb.tp, op))
+            if ea.tp != eb.tp:
+                invalid_expr_syntax_err()
+            tp = ea.tp
             if op in ("===", "!=="):
-                if ea.tp.is_int or eb.tp.is_int:
-                    self.start_token.syntax_err("不能对int类型做‘%s’运算" % op)
-                tp = ea.tp.to_int_type()
+                if not tp.is_obj:
+                    invalid_expr_syntax_err()
+                tp = tp.to_bool_type()
+            elif op in ("&&", "||"):
+                if not tp.is_bool:
+                    invalid_expr_syntax_err()
+            elif op in ("==", "!="):
+                if tp.is_obj:
+                    invalid_expr_syntax_err()
+                tp = tp.to_bool_type()
             else:
-                if not (ea.tp.is_int and eb.tp.is_int):
-                    self.start_token.syntax_err("不能对非int类型做‘%s’运算" % op)
-                tp = ea.tp
+                if not tp.is_int:
+                    invalid_expr_syntax_err()
+                if op in ("<", ">", "<=", ">="):
+                    tp = tp.to_bool_type()
             self._push_expr(_Expr(op, (ea, eb), tp))
 
         elif op == "if":
@@ -108,8 +120,8 @@ class _ParseStk:
             eb = self._pop_expr()
             e_cond = self._pop_expr()
             ea = self._pop_expr()
-            if not e_cond.tp.is_int:
-                self.start_token.syntax_err("‘if-else’表达式的条件表达式必须是int类型")
+            if not e_cond.tp.is_bool:
+                self.start_token.syntax_err("‘if-else’表达式的条件表达式必须是bool类型")
             if ea.tp != eb.tp:
                 self.start_token.syntax_err("‘if-else’表达式的两个分支运算分量类型必须相同")
             self._push_expr(_Expr(op, (e_cond, ea, eb), ea.tp))
@@ -146,7 +158,7 @@ class Parser:
         self.fom            = fom
         self.caller         = caller    #使用parser的逻辑对象，有的流程中会回调其中的方法
 
-    def parse(self, var_map_stk, need_int_type):
+    def parse(self, var_map_stk, need_tp):
         start_token = self.token_list.peek()
         parse_stk = _ParseStk(start_token, self.mod, self.cls, self.fom)
         while True:
@@ -167,7 +179,7 @@ class Parser:
                 if self.token_list.peek().is_sym(")"):
                     #空tuple
                     self.token_list.pop_sym(")")
-                    parse_stk._push_expr(_Expr("tuple", [], swc_type.make_non_int_type(start_t)))
+                    parse_stk._push_expr(_Expr("tuple", [], swc_type.make_obj_type(start_t)))
                 else:
                     e = self.parse(var_map_stk, None)
                     t = self.token_list.pop()
@@ -178,7 +190,7 @@ class Parser:
                         #tuple
                         el = [e] + self._parse_expr_list(var_map_stk, ")")
                         self._el_to_obj_el(el)
-                        parse_stk._push_expr(_Expr("tuple", el, swc_type.make_non_int_type(start_t)))
+                        parse_stk._push_expr(_Expr("tuple", el, swc_type.make_obj_type(start_t)))
                     else:
                         t.syntax_err("需要‘,’或‘)’")
 
@@ -186,7 +198,7 @@ class Parser:
                 #list
                 el = self._parse_expr_list(var_map_stk, "]")
                 self._el_to_obj_el(el)
-                parse_stk._push_expr(_Expr("list", el, swc_type.make_non_int_type(t)))
+                parse_stk._push_expr(_Expr("list", el, swc_type.make_obj_type(t)))
 
             elif t.is_sym("{"):
                 #dict
@@ -206,7 +218,7 @@ class Parser:
                     if sym == "}":
                         break
                     t.syntax_err("需要‘,’或‘}’")
-                parse_stk._push_expr(_Expr("dict", kvel, swc_type.make_non_int_type(start_t)))
+                parse_stk._push_expr(_Expr("dict", kvel, swc_type.make_obj_type(start_t)))
 
             elif t.is_name:
                 #name
@@ -236,14 +248,17 @@ class Parser:
 
             elif t.is_literal:
                 #literal
-                if t.is_literal("int"):
-                    e = _Expr("literal_int", t, swc_type.make_int_type(t))
+                if t.is_literal("bool"):
+                    tp = swc_type.make_bool_type(t)
+                elif t.is_literal("int"):
+                    tp = swc_type.make_int_type(t)
                 else:
-                    e = _Expr("literal", t, swc_type.make_non_int_type(t))
+                    tp = swc_type.make_obj_type(t)
+                e = _Expr("literal", t, tp)
                 if t.is_literal("str") and self.token_list.peek().is_sym(".") and self.token_list.peek(1).is_sym("("):
                     #字符串字面量的format语法
                     fmt, el = self._parse_str_format(var_map_stk, t)
-                    e = _Expr("str_format", (fmt, el), swc_type.make_non_int_type(t))
+                    e = _Expr("str_format", (fmt, el), tp)
                 parse_stk._push_expr(e)
 
             elif t.is_reserved("this"):
@@ -256,20 +271,20 @@ class Parser:
                 #函数对象
                 func_obj = swc_mod.parse_func_obj(t, self.token_list, self.mod, self.cls, var_map_stk)
                 self.caller.def_func_obj(func_obj)
-                parse_stk._push_expr(_Expr("func_obj", func_obj, swc_type.make_non_int_type(t)))
+                parse_stk._push_expr(_Expr("func_obj", func_obj, swc_type.make_obj_type(t)))
 
             elif t.is_reserved("isinstanceof"):
-                tp = swc_type.make_int_type(t)
+                tp = swc_type.make_bool_type(t)
                 self.token_list.pop_sym("(")
-                e = self.parse(var_map_stk, False)
+                e = self.parse(var_map_stk, swc_type.make_obj_type(self.token_list.peek()))
                 self.token_list.pop_sym(",")
                 t = self.token_list.pop()
-                if t.is_reserved("int"):
+                if t.is_reserved("bool") or t.is_reserved("int"):
                     if e.op == "this":
                         assert self.cls is not None
                         parse_stk._push_expr(_Expr("isinstanceof_this", False, tp))
                     else:
-                        parse_stk._push_expr(_Expr("isinstanceof_int", e, tp))
+                        parse_stk._push_expr(_Expr("isinstanceof_%s" % t.value, e, tp))
                 else:
                     if not t.is_name:
                         t.syntax_err("需要类型")
@@ -308,13 +323,21 @@ class Parser:
                 if t.is_sym("."):
                     obj_expr = parse_stk._pop_expr()
                     t = self.token_list.pop()
-                    if t.is_reserved("int"):
-                        #int类型断言
-                        if obj_expr.tp.is_int:
-                            t.syntax_err("没必要对int值做int类型断言")
+                    if t.is_reserved("bool") or t.is_reserved("int"):
+                        #基础类型断言
+                        if not obj_expr.tp.is_obj:
+                            t.syntax_err("只能对对象类型的值做基础类型断言")
                         if obj_expr.op == "this":
-                            t.syntax_err("不能对‘this’做int类型断言")
-                        parse_stk._push_expr(_Expr("type_assert_int", obj_expr, swc_type.make_int_type(t)))
+                            t.syntax_err("不能对‘this’做基础类型断言")
+
+                        if t.is_reserved("bool"):
+                            tp = swc_type.make_bool_type(t)
+                        elif t.is_reserved("int"):
+                            tp = swc_type.make_int_type(t)
+                        else:
+                            swc_util.abort()
+
+                        parse_stk._push_expr(_Expr("type_assert_%s" % t.value, obj_expr, tp))
                         continue
 
                     #属性或方法调用
@@ -339,7 +362,7 @@ class Parser:
                                     #尽量检测一下，可能漏报错误，但保证了目标代码不会编译失败
                                     t.syntax_err("程序中没有签名为‘%s<%d>’的方法" % (name, arg_count))
                             self._el_to_obj_el(el)
-                            parse_stk._push_expr(_Expr("call_method", (obj_expr, name, el), swc_type.make_non_int_type(t)))
+                            parse_stk._push_expr(_Expr("call_method", (obj_expr, name, el), swc_type.make_obj_type(t)))
                     else:
                         #属性访问
                         if obj_expr.op == "this":
@@ -350,7 +373,7 @@ class Parser:
                         else:
                             if name not in swc_mod.all_attr_name_set:
                                 t.syntax_err("程序中没有名为‘%s’的属性" % name)
-                            parse_stk._push_expr(_Expr(".", (obj_expr, name), swc_type.make_non_int_type(t)))
+                            parse_stk._push_expr(_Expr(".", (obj_expr, name), swc_type.make_obj_type(t)))
 
                 else:
                     self.token_list.revert()
@@ -369,11 +392,9 @@ class Parser:
                 t.syntax_err("需要双目或三目运算符")
 
         e = parse_stk.finish()
-        if need_int_type is not None:
-            if need_int_type and not e.tp.is_int:
-                parse_stk.start_token.syntax_err("表达式类型需要int")
-            if not need_int_type and e.tp.is_int:
-                parse_stk.start_token.syntax_err("表达式类型需要非int")
+        if need_tp is not None:
+            if need_tp != e.tp:
+                parse_stk.start_token.syntax_err("表达式需要是‘%s’类型" % need_tp)
         return e
 
     def _check_arg_list(self, t, arg_map, el):
@@ -384,14 +405,17 @@ class Parser:
                 t.syntax_err("参数#%d类型不匹配" % (i + 1))
 
     def _to_obj_e(self, e):
-        if e.tp.is_int:
-            e = _Expr("int_to_obj", e, e.tp.to_non_int_type())
+        if e.tp.is_bool:
+            e = _Expr("bool_to_obj", e, e.tp.to_obj_type())
+        elif e.tp.is_int:
+            e = _Expr("int_to_obj", e, e.tp.to_obj_type())
+        else:
+            pass
         return e
 
     def _el_to_obj_el(self, el):
         for i, e in enumerate(el):
-            if e.tp.is_int:
-                el[i] = _Expr("int_to_obj", e, e.tp.to_non_int_type())
+            el[i] = self._to_obj_e(e)
 
     def _parse_mod_elem_expr(self, mod, name_token, name, var_map_stk):
         elem = mod.get_elem(name)

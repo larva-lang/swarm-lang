@@ -49,7 +49,7 @@ class Parser:
                 if self.token_list.peek().is_sym(";"):
                     stmt = _Stmt("return_default")
                 else:
-                    stmt = _Stmt("return", expr = self.expr_parser.parse(var_map_stk, self.fom.tp.is_int))
+                    stmt = _Stmt("return", expr = self.expr_parser.parse(var_map_stk, self.fom.tp))
                 stmt_list.append(stmt)
                 self.token_list.pop_sym(";")
                 continue
@@ -65,7 +65,7 @@ class Parser:
 
             if t.is_reserved("while"):
                 self.token_list.pop_sym("(")
-                expr = self.expr_parser.parse(var_map_stk, True)
+                expr = self.expr_parser.parse(var_map_stk, swc_type.make_bool_type(self.token_list.peek()))
                 self.token_list.pop_sym(")")
                 self.token_list.pop_sym("{")
                 while_stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep + 1)
@@ -79,7 +79,7 @@ class Parser:
                 else_stmt_list = None
                 while True:
                     self.token_list.pop_sym("(")
-                    expr = self.expr_parser.parse(var_map_stk, True)
+                    expr = self.expr_parser.parse(var_map_stk, swc_type.make_bool_type(self.token_list.peek()))
                     self.token_list.pop_sym(")")
                     self.token_list.pop_sym("{")
                     if_stmt_list = self.parse(var_map_stk + (swc_util.OrderedDict(),), loop_deep)
@@ -108,8 +108,9 @@ class Parser:
                     if self.token_list.peek().is_sym("="):
                         self.token_list.pop_sym("=")
                         init_expr = self.expr_parser.parse(var_map_stk, None)
-                        if init_expr.tp.is_int and not tp.is_int:
-                            tp = tp.to_int_type()
+                        if tp.is_obj:
+                            #没有指定变量类型，直接使用初始化表达式的类型
+                            tp = tp.to_other_type(init_expr.tp)
                             var_map_stk[-1][name] = tp
                     else:
                         init_expr = None
@@ -146,11 +147,18 @@ class Parser:
             lvalue = expr
             if not lvalue.is_lvalue:
                 expr_token.syntax_err("需要左值")
-            if lvalue.op == "gv":
-                gv = lvalue.arg
-                if gv.is_final:
-                    expr_token.syntax_err("不能对final修饰的全局变量‘%s’赋值" % gv)
-            expr = self.expr_parser.parse(var_map_stk, lvalue.tp.is_int)
+            def check_final_gv(lvalue_e):
+                if lvalue_e.op == "gv":
+                    gv = lvalue_e.arg
+                    if gv.is_final:
+                        expr_token.syntax_err("不能对final修饰的全局变量‘%s’赋值" % gv)
+                elif lvalue_e.op == "tuple":
+                    el = lvalue_e.arg
+                    assert el
+                    for e in el:
+                        check_final_gv(e)
+            check_final_gv(lvalue)
+            expr = self.expr_parser.parse(var_map_stk, lvalue.tp)
             self.token_list.pop_sym(";")
             stmt_list.append(_Stmt("assign", lvalue = lvalue, expr = expr))
 
@@ -166,7 +174,7 @@ class Parser:
         for_var_map = swc_util.OrderedDict()
         self._add_lv(name, tp, var_map_stk + (for_var_map,))
         self.token_list.pop_sym(":")
-        iter_expr = self.expr_parser.parse(var_map_stk, False) #iter_expr不能用for_var_map的变量
+        iter_expr = self.expr_parser.parse(var_map_stk, swc_type.make_obj_type(self.token_list.peek())) #iter_expr不能用for_var_map的变量
         self.token_list.pop_sym(")")
         return for_var_map, iter_expr
 

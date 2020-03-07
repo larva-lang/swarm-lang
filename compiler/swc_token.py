@@ -29,7 +29,7 @@ BINOCULAR_OP_SYM_SET = set(["%", "^", "&", "*", "-", "+", "|", "<", ">", "/", "!
 _SYM_SET = set("""~!()={}[]:;'",.""") | BINOCULAR_OP_SYM_SET
 
 _RESERVED_WORD_SET = set(["import", "class", "func", "for", "while", "if", "else", "return", "nil", "break", "continue", "this", "public",
-                          "var", "defer", "final", "isinstanceof", "int"])
+                          "var", "defer", "final", "isinstanceof", "int", "bool", "true", "false"])
 
 class _Token(swc_util.Freezable):
     def __init__(self, type, value, src_fn, line_idx, pos):
@@ -61,7 +61,7 @@ class _Token(swc_util.Freezable):
             def __nonzero__(self):
                 return self.token.type.startswith("literal_")
             def __call__(self, type):
-                assert type in ("nil", "int", "float", "str")
+                assert type in ("nil", "bool", "int", "float", "str")
                 return self and self.token.type == "literal_" + type
         self.is_literal = IsLiteral(self)
 
@@ -353,6 +353,8 @@ class Parser:
             if w is not None:
                 if w == "nil":
                     return _Token("literal_nil", w, self.src_fn, self.line_idx, token_pos)
+                if w in ("true", "false"):
+                    return _Token("literal_bool", w, self.src_fn, self.line_idx, token_pos)
                 return _Token("word", w, self.src_fn, self.line_idx, token_pos)
 
         finally:
