@@ -180,9 +180,9 @@ class Parser:
 
     def _add_lv(self, name, tp, var_map_stk):
         if name in var_map_stk[-1]:
-            tp.token.syntax_err("局部变量‘%s’重定义")
+            tp.token.syntax_err("局部变量‘%s’重定义" % name)
         for var_map in var_map_stk[: -1]:
             if name in var_map:
-                tp.token.syntax_err("局部变量‘%s’和上层局部变量名字冲突")
+                tp.token.syntax_err("局部变量‘%s’和上层局部变量名字冲突" % name)
         swc_mod.check_lv_name_conflict(name, tp.token, self.mod)
         var_map_stk[-1][name] = tp
